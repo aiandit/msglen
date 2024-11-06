@@ -1,0 +1,36 @@
+[project]
+name = "msglen"
+authors = [
+  { name="Johannes Willkomm", email="jwillkomm@ai-and-it.de" },
+]
+description = "Simple Binary Stream Messages"
+# readme = "README.rst"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = []
+dynamic = ["version"]
+
+[project.optional-dependencies]
+build = ["build"]
+test = ["pytest", "tox"]
+
+[project.urls]
+"Homepage" = "https://github.com/aiandit/msglen"
+"Bug Tracker" = "https://github.com/aiandit/msglen/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+msglen-pydiff = "msglen.cmdline:pydiff"
+msglen-pycanon = "msglen.cmdline:pycanon"
+msglen-select = "msglen.cmdline:pyselect"
+msglen-noop = "msglen.cmdline:pynoop"
+
+[tool.hatch.version]
+path = "msglen/__init__.py"
