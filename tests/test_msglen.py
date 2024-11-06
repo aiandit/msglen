@@ -9,7 +9,7 @@ msglend = msglen.MsglenD()
 msglenb = msglen.MsglenB()
 msglenl = msglen.MsglenL()
 
-msglenProto = msglenl
+msglenProto = msglend
 
 async def f_test_msglen2_read():
     maxconnect = 3
