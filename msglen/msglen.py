@@ -7,6 +7,15 @@ import binascii
 
 from inspect import iscoroutinefunction
 
+totalHeaderSize = 12
+
+nBytesID = 4
+nBytesHeaderLength = 4
+nBytesBodyLength = 4
+
+nBytesAlign = 8
+
+maxMetaSize = 2**14
 
 def ensure_co(readfunc):
     if iscoroutinefunction(readfunc):
@@ -17,8 +26,8 @@ def ensure_co(readfunc):
         return c
 
 
-alignTo = 8
-baseHeadLen = 16
+alignTo = nBytesAlign
+baseHeadLen = totalHeaderSize
 
 trace_head = 0b001
 trace_meta = 0b010
@@ -35,7 +44,7 @@ def getpad(n):
 
 class MsglenL:
     msglenId = b'msgl'
-    headerFmt = struct.Struct('> 4s L Q')
+    headerFmt = struct.Struct('> 4s L L')
 
     file = None
     reader = None
@@ -65,29 +74,29 @@ class MsglenL:
     def readHeader(self):
         if self.canSeek and self.needSeek(10):
             self.file.seek(0)
-        datahead = self.file.read(16)
+        datahead = self.file.read(totalHeaderSize)
         id, headlen, msglen = self.unpackHeader(datahead)
         self.header = dict(id=id, headlen=headlen, msglen=msglen)
 
     def readMeta(self):
         if self.header is None:
             self.readHeader()
-        if self.canSeek and self.needSeek(16):
-            self.file.seek(16)
+        if self.canSeek and self.needSeek(totalHeaderSize):
+            self.file.seek(totalHeaderSize)
         datameta = self.file.read(self.header['headlen'])
         return datameta.decode('utf8')
 
     def readData(self):
         if self.header is None:
             self.readHeader()
-        if self.canSeek and self.needSeek(self.header['headlen'] + 16):
-            self.file.seek(self.header.headlen + 16)
+        if self.canSeek and self.needSeek(self.header['headlen'] + totalHeaderSize):
+            self.file.seek(self.header.headlen + totalHeaderSize)
         data = self.file.read(self.header.msglen)
         return data
 
     def writeMeta(self, meta):
         self.file.seek(0)
-        datahead = self.file.read(16)
+        datahead = self.file.read(totalHeaderSize)
         id, headlen, msglen = self.unpackHeader(datahead)
         datameta = b''
         if len(meta):
@@ -95,7 +104,7 @@ class MsglenL:
             if len(datameta) > headlen:
                 raise BaseException('Header data too large')
             datameta = datameta + getpad(headlen - len(datameta))
-            self.file.seek(16)
+            self.file.seek(totalHeaderSize)
             self.file.write(datameta)
 
     def packHeader(self, hlen, msglen):
@@ -184,8 +193,8 @@ class MsglenL:
     def reader(self, read):
 
         async def inner():
-            datahead = await read(16)
-            if len(datahead) < 16: return None, None
+            datahead = await read(totalHeaderSize)
+            if len(datahead) < totalHeaderSize: return None, None
             id, headlen, msglen = self.unpackHeader(datahead)
             data = await read(msglen + headlen)
             return self.unpack(data, headlen, msglen)
@@ -204,17 +213,16 @@ class MsglenL:
 
 class MsglenB(MsglenL):
     msglenId = b'msgb'
-    headerFmt = struct.Struct('> 4s 4s 8s')
+    headerFmt = struct.Struct('> 4s 4s 4s')
 
     def packHeader(self, hlen, msglen):
         data = MsglenL.headerFmt.pack(MsglenL.msglenId, hlen, msglen)
 
         assert data[4] == 0
         assert data[8] == 0
-        assert data[9] == 0
 
         hlenb = data[5:8]
-        msglenb = data[10:]
+        msglenb = data[9:]
 
         hlend = binascii.b2a_base64(hlenb, newline=False)
         msglend = binascii.b2a_base64(msglenb, newline=False)
@@ -228,7 +236,7 @@ class MsglenB(MsglenL):
         hlenb = binascii.a2b_base64(hlend)
         msglenb = binascii.a2b_base64(msglend)
 
-        rawdata = id + b'\00' + hlenb + b'\00\00' + msglenb
+        rawdata = id + b'\00' + hlenb + b'\00' + msglenb
 
         id, hlen, msglen = MsglenL.headerFmt.unpack(rawdata)
         return id, hlen, msglen
@@ -244,11 +252,9 @@ class MsglenH(MsglenB):
         assert data[5] == 0
         assert data[8] == 0
         assert data[9] == 0
-        assert data[10] == 0
-        assert data[11] == 0
 
         hlenb = data[6:8]
-        msglenb = data[12:]
+        msglenb = data[10:]
 
         hlend = binascii.b2a_hex(hlenb)
         msglend = binascii.b2a_hex(msglenb)
@@ -275,7 +281,7 @@ class MsglenD(MsglenB):
         data = MsglenL.headerFmt.pack(MsglenL.msglenId, hlen, msglen)
 
         hlenb = f'{hlen:4d}'.encode('utf8')
-        msglend = f'{msglen:8d}'
+        msglend = f'{msglen:4d}'
         if msglend[0] == ' ' and msglend[1] == ' ':
             msglend = msglend[1:] + ' '
         msglenb = msglend.encode('utf8')
@@ -284,10 +290,9 @@ class MsglenD(MsglenB):
 
     @classmethod
     def _unpackHeader(cls, data):
-        id, hlend, msglend = data[0:4], data[4:8], data[8:]
+        id, hlend_and_msglend = data[0:4], data[4:].decode('utf8')
 
-        hlen = int(hlend.decode('utf8'))
-        msglen = int(msglend.decode('utf8'))
+        hlen, msglen = [ int(v) for v in hlend_and_msglend.split(' ') if v !=  '' ]
 
         return id, hlen, msglen
 
