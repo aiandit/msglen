@@ -7,6 +7,8 @@ import binascii
 
 from inspect import iscoroutinefunction
 
+from astunparse import xml2json, json2xml
+
 totalHeaderSize = 12
 
 nBytesID = 4
@@ -16,6 +18,8 @@ nBytesBodyLength = 4
 nBytesAlign = 8
 
 maxMetaSize = 2**14
+
+metaPrefereedOutput = 'json'
 
 def ensure_co(readfunc):
     if iscoroutinefunction(readfunc):
@@ -41,6 +45,36 @@ def getpad(n):
         res = b' ' * n
     return res
 
+class MsgMeta:
+    def __init__(self, data):
+        if isinstance(data, bytes):
+            data = data.decode('utf8')
+        self.data = data
+        self._dict = json.loads(self.data)
+
+    def isJSON(self):
+        return self.data[0] == '{' or self.data[0] == '['
+
+    def isXML(self):
+        return self.data[0] == '<'
+
+    def getJSON(self):
+        return self.data if self.isJSON() else xml2json(self.data)
+
+    def getXML(self):
+        return self.data if self.isXML() else json2xml(self.data)
+
+    def __str__(self):
+        if metaPrefereedOutput == 'xml':
+            return 'Meta::' + self.getXML()
+        else:
+            return 'Meta::' + self.getJSON()
+
+    def __repr__(self):
+        return 'MsgMeta(' + f'{repr(self.getJSON())})'
+
+    def get(self, key, default):
+        return self._dict.get(key, default)
 
 class MsglenL:
     msglenId = b'msgl'
@@ -84,7 +118,7 @@ class MsglenL:
         if self.canSeek and self.needSeek(totalHeaderSize):
             self.file.seek(totalHeaderSize)
         datameta = self.file.read(self.header['headlen'])
-        return datameta.decode('utf8')
+        return MsgMeta(datameta)
 
     def readData(self):
         if self.header is None:
@@ -180,8 +214,8 @@ class MsglenL:
         assert len(databody) == msglen
 
         meta = {}
-        if len(datameta) and datameta[0] == b'{'[0]:
-            meta = json.loads(datameta.decode('utf8'))
+        if len(datameta):
+            meta = MsgMeta(datameta)
 
         enc = meta.get('encoding', None)
         if enc:
