@@ -323,7 +323,7 @@ class MsglenH(MsglenB):
         hlenb = binascii.a2b_hex(hlend)
         msglenb = binascii.a2b_hex(msglend)
 
-        rawdata = id + b'\00'*2 + hlenb + b'\00'*4 + msglenb
+        rawdata = id + b'\00'*2 + hlenb + b'\00'*2 + msglenb
 
         id, hlen, msglen = MsglenL.headerFmt.unpack(rawdata)
         return id, hlen, msglen
