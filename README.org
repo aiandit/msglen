@@ -155,6 +155,7 @@ peers. The following fields may be used for such operations:
  - msg ::
  - comment ::
  - pass :: list of fields that must be passed onwards
+ - content-type :: unpack if known MIME type, such as text/json or text/xml
 
 Implementations must signal error and warning states, and other
 typical notifications using the fields error, warning, msg, comment.
