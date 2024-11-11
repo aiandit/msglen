@@ -36,7 +36,7 @@ contains inforation about the archive or message contents in the meta
 section.
 
 JSON data in the meta section can be converted to XML on the fly using
-the *json2xml* function from the *astunparse* package. The meta
+the *json2xml* function from the [[https://github.com/aiandit/astunparse][astunparse]] package. The meta
 information may also be compressed by one of the following compression
 algorithms: gzip, xz, bzip, or brötli.
 
