@@ -154,5 +154,60 @@ def test_msglenl11():
     print(res)
     assert res == (data, meta)
 
+def test_msglen_proto1():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('msgl')
+    msg = pack(data, meta)
+    res = unwrap(msg)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglen_proto1():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('msgl')
+    msg = pack(data, meta)
+    res = unwrap(msg)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglen_proto2():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('msgd')
+    msg = pack(data, meta)
+    res = unwrap(msg)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglen_proto3():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('msgh')
+    msg = pack(data, meta)
+    res = unwrap(msg)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglen_proto4():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('msgd')
+    msg = pack(data, meta)
+    res = unwrap(msg)
+    print(res)
+    assert res == (data, meta)
+
+def foreachProto():
+    def inner():
+        pass
+    return inner
+
 if __name__ == "__main__":
     test_msglen2()
