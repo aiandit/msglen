@@ -1,4 +1,7 @@
 import asyncio
+import struct
+import random
+import math
 
 from msglen import msglen
 
@@ -60,6 +63,96 @@ async def atest_msglen2():
 def test_msglen2():
     asyncio.run(atest_msglen2())
     assert True
+
+
+def test_msglenl3():
+    data = b"Hallo, Welt!"
+    msg = msglenl.pack(data)
+    print (data)
+    assert len(msg) == msglen.totalHeaderSize + len(data)
+    assert len(msg) % 8 == 0
+
+def test_msglenl4():
+    data = b"Hallo, Welt!"
+    msg = msglenl.pack(data)
+    hlen, = struct.unpack('>l', msg[4:8])
+    mlen, = struct.unpack('>l', msg[8:12])
+    assert hlen == 0
+    assert mlen == len(data)
+
+def test_msglenl5():
+    data = b"Hallo, Welt!"
+    msg = msglenl.pack(data, {'data': 123})
+    hlen, = struct.unpack('>l', msg[4:8])
+    mlen, = struct.unpack('>l', msg[8:12])
+    assert hlen > 0
+    assert mlen == len(data)
+    assert len(msg) % 8 == 0
+
+def test_msglenl6():
+    data = b"Hallo, Welt!"
+    meta = {'data': 123}
+    if random.random() > 0.65:
+        meta['r1'] = random.random()
+    if random.random() > 0.65:
+        meta['r2'] = random.random()
+    if random.random() > 0.65:
+        meta['r3'] = random.random()
+    if random.random() > 0.65:
+        meta['r4'] = random.random()
+    print(meta)
+    msg = msglenl.pack(data, meta)
+    assert len(msg) % 8 == 0
+
+def roundtrip(packer, unpacker, check=True):
+    def inner(data, meta):
+        msg = packer(data, meta)
+        print('packed:', msg)
+        rdata, rmeta = res = unpacker(msg)
+        assert rdata == data
+        assert rmeta == meta
+        return (data, meta)
+    return inner
+
+fround = roundtrip(msglenl.packer(), msglenl.unwrap)
+sround = roundtrip(msglenl.packer(meta=dict(encoding='utf8')), msglenl.unwrap)
+
+def test_msglenl7():
+    data = b"Hallo, Welt!"
+    meta = {'data': 123}
+
+    res = fround(data, meta)
+    assert res == (data, meta)
+
+def test_msglenl8():
+    data = b"Hallo, Welt!"
+    meta = {}
+
+    res = fround(data, meta)
+    assert res == (data, meta)
+
+def test_msglenl9():
+    data = b"Hallo, Welt?!"
+    meta = {}
+
+    res = fround(data, meta)
+    assert res == (data, meta)
+
+def test_msglenl10():
+    data = b"Hallo, Welt?!"
+    meta = dict(a=dict(f=1,g=2,h=3),b='Grüße',c=['Dörren', math.pi])
+
+    res = fround(data, meta)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglenl11():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    res = sround(data, meta)
+    print(res)
+    assert res == (data, meta)
 
 if __name__ == "__main__":
     test_msglen2()
