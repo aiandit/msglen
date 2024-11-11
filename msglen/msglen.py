@@ -49,8 +49,12 @@ class MsgMeta:
     def __init__(self, data):
         if isinstance(data, bytes):
             data = data.decode('utf8')
-        self.data = data
-        self._dict = json.loads(self.data)
+        if isinstance(data, dict):
+            self._dict = data
+            self.data = json.dumps(data)
+        else:
+            self.data = data
+            self._dict = json.loads(self.data)
 
     def isJSON(self):
         return self.data[0] == '{' or self.data[0] == '['
@@ -72,6 +76,10 @@ class MsgMeta:
 
     def __repr__(self):
         return 'MsgMeta(' + f'{repr(self.getJSON())})'
+
+    @property
+    def __dict__(self):
+        return self._dict
 
     def get(self, key, default):
         return self._dict.get(key, default)
@@ -167,6 +175,10 @@ class MsglenL:
         id, hlen, msglen = cls.headerFmt.unpack(data)
         return id, hlen, msglen
 
+    def unwrap(self, data):
+        id, hlen, msglen = self.unpackHeader(data[0:totalHeaderSize])
+        return self.unpack(data[totalHeaderSize:], hlen, msglen)
+
     def metaHeader(self, meta=None):
         if meta:
             mdata = json.dumps(meta).encode('utf8')
@@ -179,7 +191,7 @@ class MsglenL:
             mdata = b''
         return mdata
 
-    def pack(self, data, meta):
+    def pack(self, data, meta={}):
         enc = meta.get('encoding', None)
         if enc:
             data = data.encode(enc)
@@ -193,33 +205,42 @@ class MsglenL:
 
         return header + mhead + data
 
-    def packer(self, meta):
-        enc = meta.get('encoding', None)
-        mhead = self.metaHeader(meta)
+    def packer(self, meta={}):
+        meta_ = meta
+        enc = meta_.get('encoding', None)
+        mhead = self.metaHeader(meta_)
 
-        def inner(data):
+        def inner(data, meta=None):
             if enc:
                 data = data.encode(enc)
+            if meta is not None:
+                mhead = self.metaHeader(meta_ | meta)
             header = self.packHeader(len(mhead), len(data))
             return header + mhead + data
 
         return inner
 
     @classmethod
-    def unpack(cls, data, headlen, msglen):
+    def unpack(cls, data, headlen, msglen, toDict=True):
         datameta = data[0:headlen]
         databody = data[headlen:]
 
-        assert len(datameta) == headlen
         assert len(databody) == msglen
 
-        meta = {}
-        if len(datameta):
-            meta = MsgMeta(datameta)
+        if toDict:
+            meta = {}
+            if len(datameta):
+                meta = vars(MsgMeta(datameta))
+        else:
+            meta = MsgMeta('{}')
+            if len(datameta):
+                meta = MsgMeta(datameta)
 
         enc = meta.get('encoding', None)
         if enc:
             data = databody.decode(enc)
+        else:
+            data = databody
 
         return data, meta
 
