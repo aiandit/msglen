@@ -211,10 +211,13 @@ class MsglenL:
         mhead = self.metaHeader(meta_)
 
         def inner(data, meta=None):
+            nonlocal enc
+            if meta is not None:
+                meta = meta_ | meta
+                mhead = self.metaHeader(meta)
+                enc = meta.get('encoding', enc)
             if enc:
                 data = data.encode(enc)
-            if meta is not None:
-                mhead = self.metaHeader(meta_ | meta)
             header = self.packHeader(len(mhead), len(data))
             return header + mhead + data
 
