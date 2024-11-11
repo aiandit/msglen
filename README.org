@@ -29,10 +29,16 @@ transmit arbitrary structured information. Note that by just sending
 header and meta and a zero-length data section, a kind of side channel
 can be established.
 
-JSON data can be converted to XML on the fly using the *json2xml*
-function from the *astunparse* package. The meta information may also
-be compressed by one of the following compression algorithms: gzip,
-xz, bzip, or brötli.
+Also, the flexible nature of the protocol opens the way for all kinds
+of sub-protocols and quasi-standards. For example, archives and
+structured messages may be constructed where the main MsgLen package
+contains inforation about the archive or message contents in the meta
+section.
+
+JSON data in the meta section can be converted to XML on the fly using
+the *json2xml* function from the *astunparse* package. The meta
+information may also be compressed by one of the following compression
+algorithms: gzip, xz, bzip, or brötli.
 
 ** Header formats
 
