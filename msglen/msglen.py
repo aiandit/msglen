@@ -268,6 +268,20 @@ class MsglenL:
 
         return inner
 
+    @classmethod
+    def create(self, protocol='msgl', meta={}):
+        if protocol == 'msgl':
+            inst = MsglenL()
+        elif protocol == 'msgb':
+            inst = MsglenB()
+        elif protocol == 'msgh':
+            inst = MsglenH()
+        elif protocol == 'msgd':
+            inst = MsglenD()
+        return inst.packer(meta=meta), inst.unwrap
+
+create = MsglenL.create
+
 
 class MsglenB(MsglenL):
     msglenId = b'msgb'
