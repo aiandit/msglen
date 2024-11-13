@@ -208,7 +208,7 @@ def test_msglen_proto5():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('mx')
+    pack, unwrap = msglen.createwrappers('mx')
     msg = pack(data, meta)
     res = unwrap(msg)
     print(msg)
@@ -219,7 +219,7 @@ def test_msglen_proto6():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('mh')
+    pack, unwrap = msglen.createwrappers('mh')
     msg = pack(data, meta)
     print(msg)
     res = unwrap(msg)
