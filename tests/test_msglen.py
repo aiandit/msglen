@@ -49,7 +49,7 @@ async def f_test_msglen2_write():
 
 async def atest_msglen2():
     server = await f_test_msglen2_read()
-#    serve = asyncio.create_task(server.serve_forever())
+#    serve = asyncio.createwrappers_task(server.serve_forever())
     clients = [f_test_msglen2_write() for i in range(3)]
     cres = await asyncio.gather(*clients)
     print('clients done')
@@ -158,7 +158,7 @@ def test_msglen_proto1():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('msgl')
+    pack, unwrap = msglen.createwrappers('msgl')
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
@@ -168,7 +168,7 @@ def test_msglen_proto1():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('msgl')
+    pack, unwrap = msglen.createwrappers('msgl')
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
@@ -178,7 +178,7 @@ def test_msglen_proto2():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('msgd')
+    pack, unwrap = msglen.createwrappers('msgd')
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
@@ -188,7 +188,7 @@ def test_msglen_proto3():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('msgh')
+    pack, unwrap = msglen.createwrappers('msgh')
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
@@ -198,7 +198,7 @@ def test_msglen_proto4():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 
-    pack, unwrap = msglen.create('msgd')
+    pack, unwrap = msglen.createwrappers('msgd')
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
