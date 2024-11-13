@@ -10,8 +10,13 @@ from astunparse import xml2json, json2xml
 
 protocols = [
     'mx', 'mh',
-    'msgl', 'msgb', 'msgh', 'msgd'
+    'msgl', 'msgb', 'msgh', 'msgd',
 ]
+
+protocolFamilies = {
+    'mx': ['mx', 'mh'],
+    'msgl': ['msgl', 'msgb', 'msgh', 'msgd'],
+}
 
 nBytesAlign = 8
 maxMetaSize = 2**14
@@ -37,6 +42,11 @@ def getpad(n):
     else:
         res = b' ' * n
     return res
+
+
+class SizeException(BaseException):
+    pass
+
 
 class MsgMeta:
     def __init__(self, data):
@@ -84,6 +94,8 @@ class MsglenL:
     nBytesHeaderLength = 4
     nBytesBodyLength = 4
     nBytesOptions = 4
+    maxMetaLength = 2**32
+    maxDataLength = 2**32
 
     msglenId = b'msgl'
     headerFmt = struct.Struct('> 4s L L')
@@ -149,8 +161,20 @@ class MsglenL:
             self.file.seek(self.totalHeaderSize)
             self.file.write(datameta)
 
-    def packHeader(self, hlen, msglen):
-        return self.headerFmt.pack(self.msglenId, hlen, msglen)
+    @classmethod
+    def packHeader(cls, hlen, msglen):
+        #print(f'pack header: {cls.__name__}, {cls.msglenId}: ' +
+        # f' data limit {cls.maxDataLength}, actual {msglen}'\
+        # f' meta limit {cls.maxMetaLength}, actual {hlen}')
+        if hlen >= cls.maxMetaLength:
+            raise SizeException(f'Meta length {hlen} ({hlen:#x}) is too large for protocol {cls.msglenId}')
+        if msglen >= cls.maxDataLength:
+            raise SizeException(f'Data length {hlen} ({hlen:#x}) is too large for protocol {cls.msglenId}')
+        return cls._packHeader(hlen, msglen)
+
+    @classmethod
+    def _packHeader(cls, hlen, msglen):
+        return cls.headerFmt.pack(cls.msglenId, hlen, msglen)
 
     msglenImpl = dict()
 
@@ -214,12 +238,14 @@ class MsglenL:
         enc = meta_.get('encoding', None)
         mhead = self.metaHeader(meta_)
 
-        def inner(data, meta=None):
+        def inner(data, meta={}):
             nonlocal enc
-            if meta is not None:
-                meta = meta_ | meta
+            meta = meta_ | meta
+            if meta:
                 mhead = self.metaHeader(meta)
                 enc = meta.get('encoding', enc)
+            else:
+                mhead = b''
             if enc:
                 data = data.encode(enc)
             header = self.packHeader(len(mhead), len(data))
@@ -306,24 +332,27 @@ createwrappers = MsglenL.createwrappers
 class MsglenB(MsglenL):
     msglenId = b'msgb'
     headerFmt = struct.Struct('> 4s 4s 4s')
+    maxMetaLength = 2**24
+    maxDataLength = 2**24
 
-    def packHeader(self, hlen, msglen):
+    @classmethod
+    def _packHeader(cls, hlen, msglen):
         data = MsglenL.headerFmt.pack(MsglenL.msglenId, hlen, msglen)
 
         assert data[4] == 0
         assert data[8] == 0
 
         hlenb = data[5:8]
-        msglenb = data[9:]
+        msglenb = data[9:12]
 
         hlend = binascii.b2a_base64(hlenb, newline=False)
         msglend = binascii.b2a_base64(msglenb, newline=False)
 
-        return self.headerFmt.pack(self.msglenId, hlend, msglend)
+        return cls.headerFmt.pack(cls.msglenId, hlend, msglend)
 
     @classmethod
     def _unpackHeader(cls, data):
-        id, hlend, msglend = data[0:4], data[4:8], data[8:]
+        id, hlend, msglend = data[0:4], data[4:8], data[8:12]
 
         hlenb = binascii.a2b_base64(hlend)
         msglenb = binascii.a2b_base64(msglend)
@@ -336,8 +365,12 @@ class MsglenB(MsglenL):
 
 class MsglenH(MsglenB):
     msglenId = b'msgh'
+    maxMetaLength = 2**16
+    maxDataLength = 2**16
 
-    def packHeader(self, hlen, msglen):
+
+    @classmethod
+    def _packHeader(cls, hlen, msglen):
         data = MsglenL.headerFmt.pack(MsglenL.msglenId, hlen, msglen)
 
         assert data[4] == 0
@@ -346,16 +379,17 @@ class MsglenH(MsglenB):
         assert data[9] == 0
 
         hlenb = data[6:8]
-        msglenb = data[10:]
+        msglenb = data[10:12]
 
         hlend = binascii.b2a_hex(hlenb)
         msglend = binascii.b2a_hex(msglenb)
 
-        return self.headerFmt.pack(self.msglenId, hlend, msglend)
+        return cls.headerFmt.pack(cls.msglenId, hlend, msglend)
+
 
     @classmethod
     def _unpackHeader(cls, data):
-        id, hlend, msglend = data[0:4], data[4:8], data[8:]
+        id, hlend, msglend = data[0:4], data[4:8], data[8:12]
 
         hlenb = binascii.a2b_hex(hlend)
         msglenb = binascii.a2b_hex(msglend)
@@ -366,19 +400,19 @@ class MsglenH(MsglenB):
         return id, hlen, msglen
 
 
-class MsglenD(MsglenB):
+class MsglenD(MsglenH):
     msglenId = b'msgd'
 
-    def packHeader(self, hlen, msglen):
-        data = MsglenL.headerFmt.pack(MsglenL.msglenId, hlen, msglen)
-
+    @classmethod
+    def _packHeader(cls, hlen, msglen):
         hlenb = f'{hlen:4d}'.encode('utf8')
         msglend = f'{msglen:4d}'
         if msglend[0] == ' ' and msglend[1] == ' ':
             msglend = msglend[1:] + ' '
         msglenb = msglend.encode('utf8')
 
-        return self.headerFmt.pack(self.msglenId, hlenb, msglenb)
+        return cls.headerFmt.pack(cls.msglenId, hlenb, msglenb)
+
 
     @classmethod
     def _unpackHeader(cls, data):
@@ -422,14 +456,17 @@ class MsglenMx(MsglenL):
     nBytesOptions = 1
     nBytesHeaderLength = 2
     nBytesBodyLength = 3
+    maxMetaLength = 2**16
+    maxDataLength = 2**24
 
     msglenId = b'mx'
     headerFmt = struct.Struct('> 2s B H B H')
 
-    def packHeader(self, hlen, msglen):
+    @classmethod
+    def _packHeader(cls, hlen, msglen):
         ml_hi = (msglen >> 16) & 0xf
         ml_lo = msglen & 0xffff
-        data = MsglenMx.headerFmt.pack(self.msglenId, 0, hlen, ml_hi, ml_lo)
+        data = MsglenMx.headerFmt.pack(cls.msglenId, 0, hlen, ml_hi, ml_lo)
         return data
 
     @classmethod
@@ -440,16 +477,20 @@ class MsglenMx(MsglenL):
 
 
 class MsglenMh(MsglenMx):
+    maxMetaLength = 2**8
+    maxDataLength = 2**12
+
     msglenId = b'mh'
     headerFmt = struct.Struct('> 2s s 2s 3s')
 
-    def packHeader(self, hlen, msglen):
-        data = super().packHeader(hlen, msglen)
+    @classmethod
+    def _packHeader(cls, hlen, msglen):
+        data = MsglenMx._packHeader(hlen, msglen)
         hlenb = data[3:5]
         msglenb = data[5:]
         hlend = binascii.b2a_hex(hlenb)
         msglend = binascii.b2a_hex(msglenb)
-        data = self.headerFmt.pack(self.msglenId, b'0', hlend[2:], msglend[3:])
+        data = cls.headerFmt.pack(cls.msglenId, b'0', hlend[2:], msglend[3:])
         return data
 
     @classmethod

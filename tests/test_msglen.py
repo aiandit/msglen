@@ -69,7 +69,7 @@ def test_msglenl3():
     data = b"Hallo, Welt!"
     msg = msglenl.pack(data)
     print (data)
-    assert len(msg) == msglen.totalHeaderSize + len(data)
+    assert len(msg) == msglen.MsglenL.totalHeaderSize + len(data)
     assert len(msg) % 8 == 0
 
 def test_msglenl4():
@@ -200,6 +200,28 @@ def test_msglen_proto4():
 
     pack, unwrap = msglen.createwrappers('msgd')
     msg = pack(data, meta)
+    res = unwrap(msg)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglen_proto5():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('mx')
+    msg = pack(data, meta)
+    res = unwrap(msg)
+    print(msg)
+    print(res)
+    assert res == (data, meta)
+
+def test_msglen_proto6():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.create('mh')
+    msg = pack(data, meta)
+    print(msg)
     res = unwrap(msg)
     print(res)
     assert res == (data, meta)
