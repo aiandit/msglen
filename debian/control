@@ -1,0 +1,16 @@
+Source: msglen
+Section: misc
+Priority: optional
+Maintainer: Johannes Willkomm <j.willkomm@fionec.de>
+Build-Depends: debhelper-compat (= 13), dh-python, python3-all,
+ python3-build, pybuild-plugin-pyproject
+Standards-Version: 4.5.1
+Homepage: https://ai-and-it.de/
+Rules-Requires-Root: no
+
+Package: python3-msglen
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3
+Description: Simple Extensible Binary Message Format for Python
+ Implements the MsgLen packet format in Python, providing packet
+ wrapping and unwrapping, and readers and writers.
