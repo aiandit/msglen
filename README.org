@@ -20,7 +20,7 @@ package that follow. The meta length is recommended to be a multiple
 of 8 bytes. Thus only two reads are required for each packet: one of
 the fixed header lenght and another with the sum of the meta length
 and the data length.  This makes the entire packet very easy and
-efficient to read from a net workstream and the data will be placed at
+efficient to read from a network stream and the data will be placed at
 a 8 byte boundary in memory.
 
 While the data part contains the binary user data, the meta
