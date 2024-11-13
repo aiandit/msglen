@@ -84,7 +84,7 @@ def test_msglen_protos_header1():
 
         header = msg[0:inst.totalHeaderSize]
 
-        id, hlen, mlen = inst.unpackHeader(header)
+        id, hlen, mlen, opts = inst.unpackHeader(header)
 
         print(pr)
         print(header)
@@ -116,7 +116,7 @@ def test_msglen_protos_header2():
 
         header = msg[0:inst.totalHeaderSize]
 
-        id, hlen, mlen = inst.unpackHeader(header)
+        id, hlen, mlen, opts = inst.unpackHeader(header)
 
         print(pr)
         print(header)
