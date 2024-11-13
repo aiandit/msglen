@@ -259,17 +259,23 @@ class MsglenL:
 
         return inner
 
-    def writer(self, writer, meta):
+    def writer(self, writer, meta={}):
+        meta_ = meta
+        def inner(data, meta={}):
 
-        def inner(data):
-
-            data = self.pack(data, meta)
+            data = self.pack(data, meta_|meta)
             wres = writer.write(data)
 
         return inner
 
+    def wrappers(self, meta={}):
+        return self.packer(meta=meta), self.unwrap
+
+    def readers(self, reader, writer, meta={}):
+        return self.reader(reader), self.writer(writer, meta=meta)
+
     @classmethod
-    def create(self, protocol='msgl', meta={}):
+    def create(cls, protocol='msgl'):
         if protocol == 'msgl':
             inst = MsglenL()
         elif protocol == 'msgb':
@@ -278,9 +284,15 @@ class MsglenL:
             inst = MsglenH()
         elif protocol == 'msgd':
             inst = MsglenD()
-        return inst.packer(meta=meta), inst.unwrap
+        return inst
+
+    @classmethod
+    def createwrappers(cls, protocol='msgl'):
+        return cls.create(protocol).wrappers()
+
 
 create = MsglenL.create
+createwrappers = MsglenL.createwrappers
 
 
 class MsglenB(MsglenL):
@@ -367,6 +379,33 @@ class MsglenD(MsglenB):
         hlen, msglen = [ int(v) for v in hlend_and_msglend.split(' ') if v !=  '' ]
 
         return id, hlen, msglen
+
+class MslenReader:
+
+    def __init__(self, reader, proto='msgl', **kw):
+        super().__init__(**kw)
+
+        inst = MsglenL.create(proto)
+
+        self.reader = reader
+        self.readhandle = inst.reader(reader)
+
+    async def read(self):
+        return await self.readhandle()
+
+
+class MslenWriter:
+
+    def __init__(self, writer, proto='msgl', meta={}, **kw):
+        super().__init__(**kw)
+
+        inst = MsglenL.create(proto)
+
+        self.writer = writer
+        self.writehandle = inst.writer(writer, meta)
+
+    def write(self, data, meta={}):
+        return self.writehandle(data, meta)
 
 
 async def run():
