@@ -14,11 +14,11 @@ msglenl = msglen.MsglenL()
 
 msglenProto = msglend
 
-async def f_test_msglen2_read():
+async def af_atest_msglen_async2_read():
     maxconnect = 3
+    msglenProto.trace = 0
     async def connected(reader, writer):
         nonlocal maxconnect
-        msglenProto.trace = 1
         msgread = msglenProto.reader(reader.read)
         msgwrite = msglenb.writer(writer, dict(server='Test123', encoding='utf8'))
         while True:
@@ -30,11 +30,12 @@ async def f_test_msglen2_read():
             msgwrite(msg)
         writer.close()
         print('server: client task done')
+    print(f'start server')
     server = await asyncio.start_server(connected, port=11001)
     print('server: started')
     return server
 
-async def f_test_msglen2_write():
+async def af_atest_msglen_async2_writer():
     reader, writer = await asyncio.open_connection(port=11001)
     msgread = msglenProto.reader(reader.read)
     msgwrite = msglenProto.writer(writer, dict(client='Client123', encoding='utf8'))
@@ -47,10 +48,9 @@ async def f_test_msglen2_write():
     writer.close()
 
 
-async def atest_msglen2():
-    server = await f_test_msglen2_read()
-#    serve = asyncio.createwrappers_task(server.serve_forever())
-    clients = [f_test_msglen2_write() for i in range(3)]
+async def af_atest_msglen_async2():
+    server = await af_atest_msglen_async2_read()
+    clients = [af_atest_msglen_async2_writer() for i in range(3)]
     cres = await asyncio.gather(*clients)
     print('clients done')
     if False:
@@ -60,8 +60,11 @@ async def atest_msglen2():
         sres = await asyncio.sleep(1)
         print('server test exit')
 
-def test_msglen2():
-    asyncio.run(atest_msglen2())
+async def atest_msglen_async2():
+    await asyncio.wait_for(af_atest_msglen_async2(), 10)
+
+def test_msglen_async2():
+    asyncio.run(atest_msglen_async2())
     assert True
 
 
@@ -70,7 +73,7 @@ def test_msglenl3():
     msg = msglenl.pack(data)
     print (data)
     assert len(msg) == msglen.MsglenL.totalHeaderSize + len(data)
-    assert len(msg) % 8 == 0
+    assert len(msg) % 8 == len(data) % 8
 
 def test_msglenl4():
     data = b"Hallo, Welt!"
@@ -87,7 +90,7 @@ def test_msglenl5():
     mlen, = struct.unpack('>l', msg[8:12])
     assert hlen > 0
     assert mlen == len(data)
-    assert len(msg) % 8 == 0
+    assert len(msg) % 8 == len(data) % 8
 
 def test_msglenl6():
     data = b"Hallo, Welt!"
@@ -102,7 +105,7 @@ def test_msglenl6():
         meta['r4'] = random.random()
     print(meta)
     msg = msglenl.pack(data, meta)
-    assert len(msg) % 8 == 0
+    assert len(msg) % 8 == len(data) % 8
 
 def roundtrip(packer, unpacker, check=True):
     def inner(data, meta):
@@ -226,10 +229,6 @@ def test_msglen_proto6():
     print(res)
     assert res == (data, meta)
 
-def foreachProto():
-    def inner():
-        pass
-    return inner
 
 if __name__ == "__main__":
     test_msglen2()
