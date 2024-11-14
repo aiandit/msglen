@@ -101,13 +101,13 @@ async def run(args=None):
 
     datareader = asyncio.create_task(readstdin())
 
-    if args.verbose > 1:
-        print('wait for stdin read')
-    async with dataRead:
-        await dataRead.wait()
-
-    if args.verbose > 1:
-        print(f'got input! {data}')
+    async def waitforstdinend():
+        if args.verbose > 1:
+            print('wait for stdin read')
+        async with dataRead:
+            await dataRead.wait()
+        if args.verbose > 1:
+            print(f'got input! {data}')
 
     def writeOut(write):
         def inner(data):
@@ -119,6 +119,8 @@ async def run(args=None):
                     write(data)
         return inner
 
+
+    readstdintask = asyncio.create_task(waitforstdinend())
 
     params = {}
     if args.param:
@@ -141,11 +143,25 @@ async def run(args=None):
         print(f'cmd = {args.cmd}')
 
     if args.cmd == "wrap":
+        await readstdintask
         wrap = msglenb.packer(dict(encoding='utf8')|params)
         msg = wrap(data)
         writeOut(outf.write)(msg)
 
     elif args.cmd == "unwrap":
+        await readstdintask
+        wrap = msglenb.unwrap(data)
+        msg, meta = wrap
+        if args.param:
+            print(meta.asJSON())
+        elif args.verbose:
+            print('meta:', meta)
+
+        if (args.param is None and not args.message) or (args.message):
+            writeOut(outf.write)(msg)
+
+    elif args.cmd == "wraplines":
+        await lineradertask
         wrap = msglenb.unwrap(data)
         msg, meta = wrap
         if args.param:
