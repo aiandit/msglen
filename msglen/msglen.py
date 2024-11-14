@@ -208,9 +208,9 @@ class MsglenL:
     def _unpackHeader(cls, data):
         return cls.headerFmt.unpack(data)
 
-    def unwrap(self, data):
+    def unwrap(self, data, toDict=False):
         id, hlen, msglen, flags = self.unpackHeader(data[0:self.totalHeaderSize])
-        return self.unpack(data[self.totalHeaderSize:], hlen, msglen, flags)
+        return self.unpack(data[self.totalHeaderSize:], hlen, msglen, flags, toDict=toDict)
 
     def metaHeader(self, meta=None):
         if meta:
