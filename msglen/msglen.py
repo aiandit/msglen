@@ -67,17 +67,17 @@ class MsgMeta:
     def isXML(self):
         return self.data[0] == '<'
 
-    def getJSON(self):
-        return self.data if self.isJSON() else xml2json(self.data)
+    def asJSON(self):
+        return self.data.strip() if self.isJSON() else xml2json(self.data)
 
-    def getXML(self):
-        return self.data if self.isXML() else json2xml(self.data)
+    def asXML(self):
+        return self.data.strip() if self.isXML() else json2xml(self.data)
 
     def __str__(self):
-        if metaPrefereedOutput == 'xml':
-            return 'Meta::' + self.getXML()
+        if metaPreferedOutput == 'xml':
+            return 'Meta::' + self.asXML()
         else:
-            return 'Meta::' + self.getJSON()
+            return 'Meta::' + self.asJSON()
 
     def __repr__(self):
         return 'MsgMeta(' + f'{repr(self.getJSON())})'
