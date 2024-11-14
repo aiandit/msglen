@@ -27,10 +27,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-msglen-pydiff = "msglen.cmdline:pydiff"
-msglen-pycanon = "msglen.cmdline:pycanon"
-msglen-select = "msglen.cmdline:pyselect"
-msglen-noop = "msglen.cmdline:pynoop"
+msgl = "msglen.cmdline:run"
 
 [tool.hatch.version]
 path = "msglen/__init__.py"
