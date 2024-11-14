@@ -252,7 +252,7 @@ class MsglenL:
                 enc = meta.get('encoding', enc)
             else:
                 mhead = b''
-            if enc:
+            if enc and isinstance(data, str):
                 data = data.encode(enc)
             header = self.packHeader(len(mhead), len(data))
             return header + mhead + data
