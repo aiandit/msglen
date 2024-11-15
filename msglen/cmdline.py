@@ -67,7 +67,7 @@ async def run(args=None):
 
     msglenb = msgType
 
-    dataRead = asyncio.Condition()
+    stdinComplete = asyncio.Condition()
 
     data = b''
 
@@ -93,10 +93,10 @@ async def run(args=None):
                     if fr.decode('latin1').strip() == 'exit':
                         res = await callback(b'')
                         break
-        async with dataRead:
-            dataRead.notify()
-        async with dataRead:
-            await dataRead.wait()
+        async with stdinComplete:
+            stdinComplete.notify()
+        async with stdinComplete:
+            await stdinComplete.wait()
         return data
 
     datareader = asyncio.create_task(readstdin())
@@ -104,8 +104,8 @@ async def run(args=None):
     async def waitforstdinend():
         if args.verbose > 1:
             print('wait for stdin read')
-        async with dataRead:
-            await dataRead.wait()
+        async with stdinComplete:
+            await stdinComplete.wait()
         if args.verbose > 1:
             print(f'got input! {data}')
 
@@ -172,8 +172,8 @@ async def run(args=None):
         if (args.param is None and not args.message) or (args.message):
             writeOut(outf.write)(msg)
 
-    async with dataRead:
-        dataRead.notify()
+    async with stdinComplete:
+        stdinComplete.notify()
 
     res = await datareader
 
