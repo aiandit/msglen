@@ -17,6 +17,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 build = ["build"]
 test = ["pytest", "tox"]
+all = ["build", "pytest", "tox"]
 
 [project.urls]
 "Homepage" = "https://github.com/aiandit/msglen"
