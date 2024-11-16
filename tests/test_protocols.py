@@ -47,7 +47,7 @@ def test_msglen_protos_1():
         data1, meta1 = f_proto_unwrap(pr, msg)
 
         assert data == data1
-        assert meta == meta1
+        assert meta == vars(meta1)
 
         print(pr, data, meta, msg)
 
@@ -64,7 +64,7 @@ def test_msglen_protos_2():
         data1, meta1 = f_proto_unwrap(pr, msg)
 
         assert data == data1
-        assert meta == meta1
+        assert meta == vars(meta1)
 
 
 def test_msglen_protos_header1():
@@ -145,7 +145,7 @@ def test_msglen_protocol_interop1():
                 data1, meta1 = f_proto_unwrap(prRecv, msg)
 
                 assert data == data1
-                assert meta == meta1
+                assert meta == vars(meta1)
 
 
 def test_msglen_protocol_interop2():
@@ -164,7 +164,7 @@ def test_msglen_protocol_interop2():
                 data1, meta1 = f_proto_unwrap(prRecv, msg)
 
                 assert data == data1
-                assert meta == meta1
+                assert meta == vars(meta1)
 
 
 def test_msglen_protos_too_large_1():
@@ -192,7 +192,7 @@ def test_msglen_protos_too_large_1():
             data1, meta1 = f_proto_unwrap(pr, msg)
 
             assert data == data1
-            assert meta == meta1
+            assert meta == vars(meta1)
 
 
 if __name__ == "__main__":
