@@ -423,14 +423,14 @@ class MsglenB(MsglenL):
 class MsglenH(MsglenB):
     msglenId = b'msgh'
     maxMetaLength = 2**16
-    maxDataLength = 2**16
+    maxDataLength = 2**24
     headerFmt = struct.Struct('> 4s 12s')
 
     @classmethod
     def _packHeader(cls, hlen, msglen, flags=0):
-        headerd = f'{hlen:x}'
-        if msglen != 0:
-            headerd += f' {msglen:x}'
+        headerd = f'{msglen:x}'
+        if hlen != 0:
+            headerd += f' {hlen:x}'
         if flags != 0:
             headerd += f' {flags:x}'
         headerd = ' ' * (12 - len(headerd)) + headerd
@@ -445,7 +445,7 @@ class MsglenH(MsglenB):
     @classmethod
     def _unpackHeader(cls, data):
         id, headerd = data[0:4], data[4:cls.totalHeaderSize].decode('utf8')
-        hlen, msglen, flags = cls._unpackNumbers(headerd, base=16)
+        msglen, hlen, flags = cls._unpackNumbers(headerd, base=16)
         return id, hlen, msglen, flags
 
 
@@ -454,9 +454,9 @@ class MsglenD(MsglenH):
 
     @classmethod
     def _packHeader(cls, hlen, msglen, flags=0):
-        headerd = f'{hlen:d}'
-        if msglen != 0:
-            headerd += f' {msglen:d}'
+        headerd = f'{msglen:d}'
+        if hlen != 0:
+            headerd += f' {hlen:d}'
         if flags != 0:
             headerd += f' {flags:d}'
         headerd = ' ' * (12 - len(headerd)) + headerd
@@ -466,8 +466,8 @@ class MsglenD(MsglenH):
     @classmethod
     def _unpackHeader(cls, data):
         id, headerd = data[0:4], data[4:cls.totalHeaderSize].decode('utf8')
-        items = cls._unpackNumbers(headerd, base=10)
-        return id, *items
+        msglen, hlen, flags = cls._unpackNumbers(headerd, base=10)
+        return id, hlen, msglen, flags
 
 
 class MslenReader:
@@ -525,17 +525,17 @@ class MsglenMx(MsglenL):
 
 
 class MsglenMh(MsglenMx):
-    maxMetaLength = 2**8
-    maxDataLength = 2**12
+    maxMetaLength = 2**12
+    maxDataLength = 2**24
 
     msglenId = b'mh'
     headerFmt = struct.Struct('> 2s 6s')
 
     @classmethod
     def _packHeader(cls, hlen, msglen, flags=0):
-        headerd = f'{hlen:x}'
-        if msglen != 0:
-            headerd += f' {msglen:x}'
+        headerd = f'{msglen:x}'
+        if hlen != 0:
+            headerd += f' {hlen:x}'
         if flags != 0:
             headerd += f' {flags:x}'
         headerd = ' ' * (6 - len(headerd)) + headerd
@@ -545,8 +545,8 @@ class MsglenMh(MsglenMx):
     @classmethod
     def _unpackHeader(cls, data):
         id, headerb  = cls.headerFmt.unpack(data)
-        items = MsglenH._unpackNumbers(headerb.decode('utf8'), base=16)
-        return id, *items
+        mlen, hlen, flags = MsglenH._unpackNumbers(headerb.decode('utf8'), base=16)
+        return id, hlen, mlen, flags
 
 
 async def run():
