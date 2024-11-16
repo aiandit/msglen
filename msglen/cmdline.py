@@ -56,7 +56,7 @@ def flatten(lists):
     return xslt
 
 
-async def run(args=None):
+async def arun(args=None):
     if args is None:
         parser = mkparser()
         args = parser.parse_args()
@@ -68,16 +68,19 @@ async def run(args=None):
     msglenb = msgType
 
     stdinComplete = asyncio.Condition()
+    stdinRead = asyncio.Condition()
 
     data = b''
+    lines = []
 
     async def readstdin(callback=None):
-        nonlocal data
+        nonlocal data, lines
 
         if callback is None:
             async def dataadd(d):
-                nonlocal data
+                nonlocal data, lines
                 data += d
+                lines += [d]
 
             callback = dataadd
 
@@ -88,6 +91,8 @@ async def run(args=None):
                 fr = await readtimeout(std_reader)
                 if fr is not None:
                     res = await callback(fr)
+                    async with stdinRead:
+                        stdinRead.notify()
                     if len(fr) == 0:
                         break
                     if fr.decode('latin1').strip() == 'exit':
@@ -103,20 +108,57 @@ async def run(args=None):
 
     async def waitforstdinend():
         if args.verbose > 1:
-            print('wait for stdin read')
+            print('wait for stdin read end')
         async with stdinComplete:
             await stdinComplete.wait()
-        if args.verbose > 1:
-            print(f'got input! {data}')
+        if args.verbose > 2:
+            print(f'got whole input! {data}')
+
+    async def stdinlinehandler(callback):
+        nonlocal lines
+        stop = False
+        while not stop:
+            if args.verbose > 1:
+                print('wait for stdin read')
+            async with stdinRead:
+                await stdinRead.wait()
+            while len(lines) > 0:
+                data = lines[0]
+                if args.verbose > 1:
+                    print(f'got {len(lines)} input lines: {data}')
+                if len(data) == 0:
+                    stop = True
+                    break
+                await callback(data)
+                lines = lines[1:]
+        if args.verbose:
+            print(f'stdinlinehandler exit')
+
+    async def handleLine_pack(data):
+        msg = wrap(data)
+        writeOut(outf)(msg)
+
+    async def handleLine_unpack(data):
+        msg, meta = msglenb.unwrap(data)
+        if args.param:
+            print(meta.asJSON())
+        elif args.verbose:
+            print('meta:', meta)
+
+        if (args.param is None and not args.message) or (args.message):
+            writeOut(outf)(msg)
 
     def writeOut(write):
         def inner(data):
+            if write.closed:
+                return
             try:
-                write(data)
+                write.write(data)
             except:
                 if isinstance(data, bytes):
                     data = data.decode('utf8')
-                    write(data)
+                    write.write(data)
+            outf.flush()
         return inner
 
 
@@ -128,6 +170,8 @@ async def run(args=None):
         params = { k: v for k,v in [item.split('=') for item in params] }
         if args.verbose:
             print('params:', params)
+
+    wrap = msglenb.packer(dict(encoding='utf8')|params)
 
     outf = sys.stdout
     outfname= 'stdout'
@@ -146,7 +190,7 @@ async def run(args=None):
         await readstdintask
         wrap = msglenb.packer(dict(encoding='utf8')|params)
         msg = wrap(data)
-        writeOut(outf.write)(msg)
+        writeOut(outf)(msg)
 
     elif args.cmd == "unwrap":
         await readstdintask
@@ -158,25 +202,23 @@ async def run(args=None):
             print('meta:', meta)
 
         if (args.param is None and not args.message) or (args.message):
-            writeOut(outf.write)(msg)
+            writeOut(outf)(msg)
 
-    elif args.cmd == "wraplines":
+    elif args.cmd == "wraplines" or args.cmd == "readlines":
+        lineradertask = asyncio.create_task(stdinlinehandler(handleLine_pack))
         await lineradertask
-        wrap = msglenb.unwrap(data)
-        msg, meta = wrap
-        if args.param:
-            print(meta.asJSON())
-        elif args.verbose:
-            print('meta:', meta)
 
-        if (args.param is None and not args.message) or (args.message):
-            writeOut(outf.write)(msg)
+    elif args.cmd == "unwrapmsgs" or args.cmd == "unwraplines":
+        lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
+        await lineradertask
 
     async with stdinComplete:
         stdinComplete.notify()
 
     res = await datareader
 
+def run(args=None):
+    asyncio.run(arun(args))
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    run()
