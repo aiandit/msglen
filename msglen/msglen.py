@@ -189,8 +189,6 @@ class MsglenL:
     def _packHeader(cls, hlen, msglen, flags=0):
         return cls.headerFmt.pack(cls.msglenId, hlen, msglen, flags)
 
-    msglenImpl = dict()
-
     def headerInfo(self, data):
         header = self.unpackHeader(data)
         return header[1:3]
