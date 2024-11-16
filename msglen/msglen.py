@@ -107,6 +107,8 @@ class MsglenL:
 
     msglenId = b'msgl'
     headerFmt = struct.Struct('> 4s L L L')
+
+    enableFlagsMap = True
     _flagsMap = {}
     _meta = {}
 
@@ -223,7 +225,8 @@ class MsglenL:
         data, meta = self.unpack(data[self.totalHeaderSize:], hlen, msglen, flags, toDict=toDict)
         if meta:
             self.handleMeta(vars(meta))
-        meta.__dict__ = self.dictFromFlags(flags) | meta.__dict__
+        if self.enableFlagsMap:
+            meta.__dict__ = self.dictFromFlags(flags) | meta.__dict__
         return data, meta
 
     def dictFromFlags(self, flags):
@@ -250,8 +253,9 @@ class MsglenL:
     def handleMeta(self, meta):
         if 'reset-meta' in meta:
             self._meta = {}
-        if 'set-flags-map' in meta:
-            self._flagsMap = {k: 1 for k in meta['set-flags-map']}
+        if self.enableFlagsMap:
+            if 'set-flags-map' in meta:
+                self._flagsMap = {k: 1 for k in meta['set-flags-map']}
         self._meta = self._meta | meta
 
     def metaHeader(self, meta=None):
@@ -273,7 +277,8 @@ class MsglenL:
         assert isinstance(data, bytes)
 
         mhead = self.metaHeader(meta)
-        flags |= self.flagsFromDict(meta)
+        if self.enableFlagsMap:
+            flags |= self.flagsFromDict(meta)
         header = self.packHeader(len(mhead), len(data), flags)
 
         if self.trace & trace_head:
