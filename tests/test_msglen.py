@@ -1,7 +1,10 @@
+import sys
 import asyncio
 import struct
 import random
 import math
+
+sys.path += ['.']
 
 from msglen import msglen
 
@@ -113,9 +116,17 @@ def roundtrip(packer, unpacker, check=True):
         print('packed:', msg)
         rdata, rmeta = res = unpacker(msg)
         assert rdata == data
-        assert rmeta == meta
-        return (data, meta)
+        print(rmeta)
+        print(type(rmeta))
+        print(rmeta, vars(rmeta))
+        assert vars(rmeta) == meta
+        return (data, rmeta)
     return inner
+
+def checkRes(res, data, meta):
+    res_d, res_m = res
+    assert res_d == data
+    assert vars(res_m) == meta
 
 fround = roundtrip(msglenl.packer(), msglenl.unwrap)
 sround = roundtrip(msglenl.packer(meta=dict(encoding='utf8')), msglenl.unwrap)
@@ -124,22 +135,24 @@ def test_msglenl7():
     data = b"Hallo, Welt!"
     meta = {'data': 123}
 
-    res = fround(data, meta)
-    assert res == (data, meta)
+    res_d, res_m = res = fround(data, meta)
+    assert res_d == data
+    assert vars(res_m) == meta
+    checkRes(res, data, meta)
 
 def test_msglenl8():
     data = b"Hallo, Welt!"
     meta = {}
 
     res = fround(data, meta)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglenl9():
     data = b"Hallo, Welt?!"
     meta = {}
 
     res = fround(data, meta)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglenl10():
     data = b"Hallo, Welt?!"
@@ -147,7 +160,7 @@ def test_msglenl10():
 
     res = fround(data, meta)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglenl11():
     data = "Grüße, Welt!"
@@ -155,7 +168,7 @@ def test_msglenl11():
 
     res = sround(data, meta)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto1():
     data = "Grüße, Welt!"
@@ -165,7 +178,7 @@ def test_msglen_proto1():
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto1():
     data = "Grüße, Welt!"
@@ -175,7 +188,7 @@ def test_msglen_proto1():
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto2():
     data = "Grüße, Welt!"
@@ -185,7 +198,7 @@ def test_msglen_proto2():
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto3():
     data = "Grüße, Welt!"
@@ -195,7 +208,7 @@ def test_msglen_proto3():
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto4():
     data = "Grüße, Welt!"
@@ -205,7 +218,7 @@ def test_msglen_proto4():
     msg = pack(data, meta)
     res = unwrap(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto5():
     data = "Grüße, Welt!"
@@ -216,7 +229,7 @@ def test_msglen_proto5():
     res = unwrap(msg)
     print(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 def test_msglen_proto6():
     data = "Grüße, Welt!"
@@ -227,7 +240,7 @@ def test_msglen_proto6():
     print(msg)
     res = unwrap(msg)
     print(res)
-    assert res == (data, meta)
+    checkRes(res, data, meta)
 
 
 if __name__ == "__main__":

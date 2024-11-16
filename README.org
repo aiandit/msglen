@@ -177,19 +177,31 @@ get-options field.
 The reset-options field means that the receiver reset its local meta
 state to the empty dictionary.
 
+** Flags fields
+
+Using the mechanism outlined in the previous chapter, the
+implementation is expected to cache at least certain meta fields. One
+particuluar field is ~set-flags-map~. This meta fields, when send, is
+expected to contain a list of names. Then, from the following event
+onwards, when the flags field in the header has the i-th bit set, the
+meta information from read operation must contain a field with the
+i-th name in that list, which may be an empty JSON dict or an empty
+XML element. Conversely, when the meta information provided to a write
+operation contains a field a non-false value:
+
+- a non-empty dict or node-set
+- a non-empty list
+- a non-empty string
+- a non-zero number
+- a true Boolean value
+
+then the implementation must set the i-ht bit in the flags of any
+packet it sends, from the following event onwards after the
+~set-flags-map~ command was send.
+
 ** Current implementation
 
-The current implementation in this package is incomplete and uses an
-altogether different format:
-
-| Name | Format       | 0-3     | 4-7         | 8-11        |
-|------+--------------+---------+-------------+-------------|
-|      |              | Magic   | Meta-Length | Data-Length |
-|------+--------------+---------+-------------+-------------|
-| msgl | binary       | m s g l | 32 bit      | 32 bit      |
-| msgb | ASCII base64 | m s g b | 24 bit      | 24 bit      |
-| msgh | ASCII hex.   | m s g h | 16 bit      | 16 bit.     |
-| msgd | ASCII dec.   | m s g d | 0-9999      | 0-9999      |
+The current implementation in this package is incomplete.
 
 The implementation and this spec are supposed to merge in the future
 but both are obviously still subject to change.
@@ -207,9 +219,9 @@ The methods ~pack~ can be used to construct an entire packet out of
 meta data and data. The methods ~packHeader~ and ~metaHeader~ can be
 used to construct the header and meta section byte data individually.
 
-The method ~unpackHeader~ returns the triple (id, mlen, dlen) from 12
-bytes of byte data. The combined meta and data section can be unpacked
-with the method ~unpack~.
+The method ~unpackHeader~ returns the tuple (id, mlen, dlen, flags)
+from 8 or 16 bytes of header data. The combined header, meta and data
+section can be unpacked with the method ~unpack~.
 
 The method ~reader~ returns an asynchronous reader handle when passed
 an asyncio stream reader. The methods ~writer~ returns a regular
