@@ -172,7 +172,7 @@ async def arun(args=None):
         if args.verbose:
             print('params:', params)
 
-    wrap = msglenb.packer(dict(encoding='utf8')|params)
+    wrap = msglenb.packer(dict()|params)
 
     outf = sys.stdout
     outfname= 'stdout'
@@ -189,7 +189,7 @@ async def arun(args=None):
 
     if args.cmd == "wrap":
         await readstdintask
-        wrap = msglenb.packer(dict(encoding='utf8')|params)
+        wrap = msglenb.packer(params)
         msg = wrap(data)
         writeOut(outf)(msg)
 
