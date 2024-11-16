@@ -183,7 +183,7 @@ class MsglenL:
         if hlen >= cls.maxMetaLength:
             raise SizeException(f'Meta length {hlen} ({hlen:#x}) is too large for protocol {cls.msglenId}')
         if msglen >= cls.maxDataLength:
-            raise SizeException(f'Data length {hlen} ({hlen:#x}) is too large for protocol {cls.msglenId}')
+            raise SizeException(f'Data length {msglen} ({msglen:#x}) is too large for protocol {cls.msglenId}')
         return cls._packHeader(hlen, msglen, flags)
 
     @classmethod
