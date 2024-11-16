@@ -32,3 +32,9 @@ msgl = "msglen.cmdline:run"
 
 [tool.hatch.version]
 path = "msglen/__init__.py"
+
+#[tool.hatch.build.hooks.custom]
+#path="plugin.py"
+
+[tool.hatch.build.targets.sdist.hooks.custom]
+path="plugin.py"
