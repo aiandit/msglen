@@ -1,3 +1,9 @@
+msglen (1.1.0-2) unstable; urgency=medium
+
+  * Install wheel, not source
+
+ -- Johannes Willkomm <johannes.willkomm@googlemail.com>  Sat, 16 Nov 2024 13:21:43 +0100
+
 msglen (1.1.0-1) unstable; urgency=medium
 
   * MsgMeta class for meta info
