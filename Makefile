@@ -27,7 +27,7 @@ clean-pyc:
 	find . -name '*~' -exec rm -f {} +
 
 lint:
-	flake8 lib/astunparse tests
+	flake8 --color=never --max-line-length=120 msglen tests
 
 test:
 	tox
@@ -47,3 +47,13 @@ install:
 
 install-dist:
 	$(PIP) install -I $(shell ls -1rt dist/*.whl | tail -n 1)
+
+venv = /var/lib/venvs/test
+CMD=flake8
+venv-run:
+	.  $(venv)/bin/activate && $(CMD)
+
+venv = /var/lib/venvs/test
+GOAL=dist
+venv-make:
+	.  $(venv)/bin/activate && $(MAKE) $(MAKEFLAGS) $(GOAL)

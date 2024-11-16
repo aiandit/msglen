@@ -2,6 +2,7 @@ import subprocess
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 def patchfile(fname, pat, subst):
     out = ''
     with open(fname) as f:
@@ -23,10 +24,10 @@ class SpecialBuildHook(BuildHookInterface):
 
     def initialize(self, *args):
         super().initialize(*args)
-        #rc = subprocess.run(['pwd'])
+        # rc = subprocess.run(['pwd'])
         rc = subprocess.check_output(['git', 'rev-parse', 'HEAD'])
         commitid = rc[0:6].decode('latin1')
-        #print(commitid)
+        # print(commitid)
 
         patchfile('msglen/__init__.py',
                   '__commit__',

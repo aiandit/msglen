@@ -1,11 +1,8 @@
-import os
 import sys
 import asyncio
 import argparse
 from . import __version__
 from . import __commit__
-
-from .msglen import *
 
 
 def ensure_co(readfunc):
@@ -39,7 +36,7 @@ async def readtimeout(std_reader, timeout=1e-4):
 def mkparser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser('stdinreader',
-                                     '''\
+                                         '''\
 StdinReader class CLI test tool.
 ''', '')
 
@@ -64,7 +61,6 @@ class StdinReader:
     datacallback = None
     linecallback = None
 
-
     def __init__(self, datacallback=None, linecallback=None, verbose=0, **kw):
         self.stdinComplete = asyncio.Condition()
         self.stdinRead = asyncio.Condition()
@@ -79,14 +75,11 @@ class StdinReader:
 
         self.verbose = verbose
 
-
     def __del__(self):
         pass
 
-
     async def run(self, callback=None):
         await self.readstdin(callback=callback)
-
 
     async def readstdin(self, callback=None):
 
@@ -102,13 +95,13 @@ class StdinReader:
                         self.data = fr
                     if self.linecallback:
                         self.lines += [fr]
-                        res = await self.linecallback(fr)
+                        await self.linecallback(fr)
                     async with self.stdinRead:
                         self.stdinRead.notify()
                     if len(fr) == 0:
                         break
                     if fr.decode('latin1').strip() == 'exit':
-                        res = await self.linecallback(b'')
+                        await self.linecallback(b'')
                         break
 
         if self.datacallback:

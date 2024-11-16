@@ -1,8 +1,4 @@
 import sys
-import asyncio
-import struct
-import random
-import math
 
 sys.path += ['.']
 

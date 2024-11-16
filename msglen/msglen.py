@@ -113,7 +113,6 @@ class MsglenL:
     _meta = {}
 
     file = None
-    reader = None
     header = None
     meta = None
     canSeek = False
@@ -177,7 +176,7 @@ class MsglenL:
 
     @classmethod
     def packHeader(cls, hlen, msglen, flags=0):
-        #print(f'pack header: {cls.__name__}, {cls.msglenId}: ' +
+        # print(f'pack header: {cls.__name__}, {cls.msglenId}: ' +
         # f' data limit {cls.maxDataLength}, actual {msglen}'\
         # f' meta limit {cls.maxMetaLength}, actual {hlen}')
         if hlen >= cls.maxMetaLength:
@@ -213,7 +212,7 @@ class MsglenL:
         else:
             raise BaseException(f'invalid msglen format: {id}')
         if self.trace & trace_head:
-            print(f'read header:', *header)
+            print('read header:', *header)
         return header
 
     @classmethod
@@ -315,7 +314,7 @@ class MsglenL:
                 meta = MsgMeta(datameta)
 
         if cls.trace & trace_meta:
-            print(f'meta data: ', vars(meta))
+            print('meta data: ', vars(meta))
 
         enc = meta.get('encoding', None)
         if enc:
@@ -325,12 +324,12 @@ class MsglenL:
 
         return data, meta
 
-
     def reader(self, read):
 
         async def inner():
             datahead = await read(self.totalHeaderSize)
-            if len(datahead) == 0: return None, None
+            if len(datahead) == 0:
+                return None, None
             if len(datahead) < self.totalHeaderSize:
                 raise BaseException(f'read invalid header data: {len(datahead)} B')
             if self.trace & trace_head:
@@ -345,10 +344,10 @@ class MsglenL:
 
     def writer(self, writer, meta={}):
         meta_ = meta
-        def inner(data, meta={}):
 
-            data = self.pack(data, meta_|meta)
-            wres = writer.write(data)
+        def inner(data, meta={}):
+            data = self.pack(data, meta_ | meta)
+            writer.write(data)
 
         return inner
 
@@ -440,7 +439,7 @@ class MsglenH(MsglenB):
     def _unpackNumbers(cls, headerd, base=16):
         items = [v for v in headerd.split(' ') if v != '']
         items += ['0'] * (3 - len(items))
-        return [ int(v, base) for v in items ]
+        return [int(v, base) for v in items]
 
     @classmethod
     def _unpackHeader(cls, data):
@@ -461,7 +460,6 @@ class MsglenD(MsglenH):
             headerd += f' {flags:d}'
         headerd = ' ' * (12 - len(headerd)) + headerd
         return cls.headerFmt.pack(cls.msglenId, headerd.encode('utf8'))
-
 
     @classmethod
     def _unpackHeader(cls, data):
@@ -544,7 +542,7 @@ class MsglenMh(MsglenMx):
 
     @classmethod
     def _unpackHeader(cls, data):
-        id, headerb  = cls.headerFmt.unpack(data)
+        id, headerb = cls.headerFmt.unpack(data)
         mlen, hlen, flags = MsglenH._unpackNumbers(headerb.decode('utf8'), base=16)
         return id, hlen, mlen, flags
 
