@@ -80,11 +80,17 @@ class MsgMeta:
             return 'Meta::' + self.asJSON()
 
     def __repr__(self):
-        return 'MsgMeta(' + f'{repr(self.getJSON())})'
+        return 'MsgMeta(' + f'{repr(self.asJSON())})'
 
     @property
     def __dict__(self):
         return self._dict
+
+    @__dict__.setter
+    def __dict__(self, d):
+        self._dict = d
+        if self.isJSON():
+            self.data = json.dumps(self._dict)
 
     def get(self, key, default):
         return self._dict.get(key, default)
@@ -101,6 +107,8 @@ class MsglenL:
 
     msglenId = b'msgl'
     headerFmt = struct.Struct('> 4s L L L')
+    _flagsMap = {}
+    _meta = {}
 
     file = None
     reader = None
@@ -117,6 +125,8 @@ class MsglenL:
             self.file = source
             self.reader = ensure_co(source.read)
             self.writer = ensure_co(source.write)
+        self._flagsMap = {}
+        self._meta = {}
 
     def __enter__(self):
         return self
@@ -210,7 +220,39 @@ class MsglenL:
 
     def unwrap(self, data, toDict=False):
         id, hlen, msglen, flags = self.unpackHeader(data[0:self.totalHeaderSize])
-        return self.unpack(data[self.totalHeaderSize:], hlen, msglen, flags, toDict=toDict)
+        data, meta = self.unpack(data[self.totalHeaderSize:], hlen, msglen, flags, toDict=toDict)
+        if meta:
+            self.handleMeta(vars(meta))
+        meta.__dict__ = self.dictFromFlags(flags) | meta.__dict__
+        return data, meta
+
+    def dictFromFlags(self, flags):
+        mask = 0
+        res = {}
+        names = list(self._flagsMap.keys())
+        for i in range(32):
+            mask = 1 << i
+            if flags & mask:
+                if i < len(names):
+                    flagname = names[i]
+                else:
+                    flagname = f'flag{i:02}'
+                res[flagname] = 1
+        return res
+
+    def flagsFromDict(self, meta):
+        flags = 0
+        for i, name in enumerate(self._flagsMap):
+            if name in meta and meta[name]:
+                flags |= (1 << i)
+        return flags
+
+    def handleMeta(self, meta):
+        if 'reset-meta' in meta:
+            self._meta = {}
+        if 'set-flags-map' in meta:
+            self._flagsMap = {k: 1 for k in meta['set-flags-map']}
+        self._meta = self._meta | meta
 
     def metaHeader(self, meta=None):
         if meta:
@@ -224,14 +266,15 @@ class MsglenL:
             mdata = b''
         return mdata
 
-    def pack(self, data, meta={}):
+    def pack(self, data, meta={}, flags=0):
         enc = meta.get('encoding', None)
-        if enc:
+        if enc and isinstance(data, str):
             data = data.encode(enc)
         assert isinstance(data, bytes)
 
         mhead = self.metaHeader(meta)
-        header = self.packHeader(len(mhead), len(data))
+        flags |= self.flagsFromDict(meta)
+        header = self.packHeader(len(mhead), len(data), flags)
 
         if self.trace & trace_head:
             print(f'pack header {header}:', len(mhead), len(data))
@@ -239,23 +282,14 @@ class MsglenL:
 
         return header + mhead + data
 
-    def packer(self, meta={}):
+    def packer(self, meta={}, flags=0, mask=0):
         meta_ = meta
-        enc = meta_.get('encoding', None)
-        mhead = self.metaHeader(meta_)
+        flags_ = flags
 
-        def inner(data, meta={}):
-            nonlocal enc
+        def inner(data, meta={}, flags=0):
             meta = meta_ | meta
-            if meta:
-                mhead = self.metaHeader(meta)
-                enc = meta.get('encoding', enc)
-            else:
-                mhead = b''
-            if enc and isinstance(data, str):
-                data = data.encode(enc)
-            header = self.packHeader(len(mhead), len(data))
-            return header + mhead + data
+            flags = (flags | flags_) & ~mask
+            return self.pack(data, meta, flags)
 
         return inner
 
