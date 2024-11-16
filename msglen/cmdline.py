@@ -3,6 +3,7 @@ import sys
 import asyncio
 import argparse
 from . import __version__
+from . import __commit__
 
 from .msglen import *
 
@@ -37,7 +38,7 @@ MsgLen CLI tool.
     parser.add_argument('-p', '--protocol', metavar='N', nargs='?', type=str, default='msgl')
     parser.add_argument('-s', '--param', metavar='N=V', type=str, nargs='*', action='append')
     parser.add_argument('-o', '--output', metavar='FILE', type=str)
-    parser.add_argument('-V', '--version', action="version", version=f"%(prog)s v{__version__}",
+    parser.add_argument('-V', '--version', action="version", version=f"%(prog)s v{__version__} ({__commit__})",
                         help='show %(prog)s\'s version number and exit')
     parser.add_argument('-v', '--verbose', type=int, metavar='N', nargs='?', const=1, default=0)
 
