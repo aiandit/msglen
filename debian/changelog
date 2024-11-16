@@ -1,3 +1,14 @@
+msglen (1.1.0-1) unstable; urgency=medium
+
+  * MsgMeta class for meta info
+  * Soft flags defined by sending set-flag-map meta field
+  * Commandline tool msdl
+  * Tests for CLI
+  * New version 1.1.0
+  * Show commit ID in version
+
+ -- Johannes Willkomm <jwillkomm@ai-and-it.de>  Sat, 16 Nov 2024 12:59:54 +0100
+
 msglen (1.0.1-1) unstable; urgency=medium
 
   * Switch medium size family to 16 B as intended, introduce flags to all the functions, change hex and dec headers to list of numbers
