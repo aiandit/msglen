@@ -155,7 +155,7 @@ async def arun(args=None):
                 return
             try:
                 write.write(data)
-            except:
+            except BaseException:
                 if isinstance(data, bytes):
                     data = data.decode('utf8')
                     write.write(data)

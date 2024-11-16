@@ -38,7 +38,7 @@ def ensure_co(readfunc):
 
 def getpad(n):
     if n >= 2:
-        res = b' ' * (n-2) + b'\x0d\x0a'
+        res = b' ' * (n - 2) + b'\x0d\x0a'
     elif n >= 1:
         res = b'\x0a'
     else:
