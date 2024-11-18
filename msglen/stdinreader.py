@@ -61,10 +61,12 @@ class StdinReader:
 
     datacallback = None
     linecallback = None
+    endcallback = None
 
-    def __init__(self, datacallback=None, linecallback=None, verbose=0, **kw):
+    def __init__(self, datacallback=None, linecallback=None, endcallback=None, verbose=0, **kw):
         self.stdinComplete = asyncio.Condition()
         self.stdinRead = asyncio.Condition()
+        self.stdinCanclose = asyncio.Condition()
 
         self.data = b''
         self.lines = []
@@ -73,6 +75,8 @@ class StdinReader:
             self.datacallback = ensure_co(datacallback)
         if linecallback:
             self.linecallback = ensure_co(linecallback)
+        if endcallback:
+            self.endcallback = ensure_co(endcallback)
 
         self.verbose = verbose
 
@@ -82,13 +86,20 @@ class StdinReader:
     async def run(self, callback=None):
         await self.readstdin(callback=callback)
 
+    async def release(self):
+        async with self.stdinCanclose:
+            self.stdinCanclose.notify()
+
+    async def close(self):
+        self.std_writer.close()
+
     async def readstdin(self, callback=None):
 
-        std_reader, std_writer = await connect_stdin_stdout()
+        self.std_reader, self.std_writer = await connect_stdin_stdout()
 
         while True:
-            if std_reader:
-                fr = await readtimeout(std_reader)
+            if self.std_reader:
+                fr = await readtimeout(self.std_reader)
                 if fr is not None:
                     if self.datacallback:
                         self.data += fr
@@ -105,13 +116,22 @@ class StdinReader:
                         await self.linecallback(b'')
                         break
 
+        print('read loop exited')
         if self.datacallback:
             await self.datacallback(self.data)
-        if self.verbose:
-            print('stdinread exit')
+
+        if self.endcallback:
+            await self.endcallback()
 
         async with self.stdinComplete:
             self.stdinComplete.notify()
+
+        print('wait close')
+        async with self.stdinCanclose:
+            await self.stdinCanclose.wait()
+
+        if self.verbose:
+            print('stdinread exit')
 
         return self.data
 
