@@ -37,5 +37,7 @@ class SpecialBuildHook(BuildHookInterface):
                   '__commit__',
                   f'__commit__ = "{commitid}"\n')
 
-        rc = subprocess.run(['git', 'tag', '-f', f'{msglen.__version__}'])
-        assert rc.returncode == 0
+        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
+        if branch == 'master':
+            rc = subprocess.run(['git', 'tag', '-f', f'{msglen.__version__}'])
+            assert rc.returncode == 0
