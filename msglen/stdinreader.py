@@ -1,6 +1,7 @@
 import sys
 import asyncio
 import argparse
+from inspect import iscoroutinefunction
 from . import __version__
 from . import __commit__
 
