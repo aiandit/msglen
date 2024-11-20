@@ -4,6 +4,7 @@ import argparse
 from inspect import iscoroutinefunction
 from . import __version__
 from . import __commit__
+from . import log
 
 
 def ensure_co(readfunc):
@@ -87,6 +88,8 @@ class StdinReader:
         await self.readstdin(callback=callback)
 
     async def release(self):
+        async with self.stdinComplete:
+            await self.stdinComplete.wait()
         async with self.stdinCanclose:
             self.stdinCanclose.notify()
 
@@ -101,6 +104,8 @@ class StdinReader:
             if self.std_reader:
                 fr = await readtimeout(self.std_reader)
                 if fr is not None:
+                    if self.verbose:
+                        log.log(f'data read {len(fr)}')
                     if self.datacallback:
                         self.data += fr
                     else:
@@ -116,7 +121,8 @@ class StdinReader:
                         await self.linecallback(b'')
                         break
 
-        print('read loop exited')
+        if self.verbose:
+            log.log('read loop exited')
         if self.datacallback:
             await self.datacallback(self.data)
 
@@ -126,12 +132,13 @@ class StdinReader:
         async with self.stdinComplete:
             self.stdinComplete.notify()
 
-        print('wait close')
+        if self.verbose:
+            log.log('wait close')
         async with self.stdinCanclose:
             await self.stdinCanclose.wait()
 
         if self.verbose:
-            print('stdinread exit')
+            log.log('stdinread exit')
 
         return self.data
 
