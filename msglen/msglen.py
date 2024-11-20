@@ -4,9 +4,9 @@ import math
 import io
 import asyncio
 import binascii
-from inspect import iscoroutinefunction
 
 from astunparse import xml2json, json2xml
+from .stdinreader import ensure_co
 
 protocols = [
     'mx', 'mh',
@@ -25,15 +25,6 @@ metaPreferedOutput = 'json'
 trace_head = 0b001
 trace_meta = 0b010
 trace_data = 0b100
-
-
-def ensure_co(readfunc):
-    if iscoroutinefunction(readfunc):
-        return readfunc
-    else:
-        async def c(*args, **kwargs):
-            return readfunc(*args, **kwargs)
-        return c
 
 
 def getpad(n):

@@ -5,26 +5,7 @@ from . import __version__
 from . import __commit__
 
 from .msglen import MsglenB, MsglenL
-
-
-async def connect_stdin_stdout():
-    loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-    w_transport, w_protocol = await loop.connect_write_pipe(
-        asyncio.streams.FlowControlMixin, sys.stdout)
-    writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
-    return reader, writer
-
-
-async def readtimeout(std_reader, timeout=1e-4):
-    data = b''
-    try:
-        data = await asyncio.wait_for(std_reader.read(10000), timeout)
-    except TimeoutError:
-        data = None
-    return data
+from .stdinreader import connect_stdin_stdout, readtimeout
 
 
 def mkparser(parser=None):
