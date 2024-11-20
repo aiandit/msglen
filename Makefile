@@ -31,6 +31,7 @@ lint:
 	flake8 --color=never --max-line-length=120 --ignore=E201,E202,E211,E226,E227,E231,E265,E302,E303,E305,E306,E402,F821,F841 tests
 
 test:
+	./tests/test_cmdline.sh
 	tox
 
 coverage:
