@@ -26,12 +26,8 @@ async def connect_stdin_stdout():
     return reader, writer
 
 
-async def readtimeout(std_reader, timeout=1e-4):
-    data = b''
-    try:
-        data = await asyncio.wait_for(std_reader.read(10000), timeout)
-    except TimeoutError:
-        data = None
+async def readmuch(std_reader):
+    data = await std_reader.read(1<<24)
     return data
 
 
@@ -102,7 +98,7 @@ class StdinReader:
 
         while True:
             if self.std_reader:
-                fr = await readtimeout(self.std_reader)
+                fr = await readmuch(self.std_reader)
                 if fr is not None:
                     if self.verbose:
                         log.log(f'data read {len(fr)}')

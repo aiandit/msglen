@@ -5,7 +5,7 @@ from . import __version__
 from . import __commit__
 
 from .msglen import MsglenB, MsglenL
-from .stdinreader import connect_stdin_stdout, readtimeout
+from .stdinreader import connect_stdin_stdout, readmuch
 
 
 def mkparser(parser=None):
@@ -70,7 +70,7 @@ async def arun(args=None):
 
         while True:
             if std_reader:
-                fr = await readtimeout(std_reader)
+                fr = await readmuch(std_reader)
                 if fr is not None:
                     await callback(fr)
                     async with stdinRead:
