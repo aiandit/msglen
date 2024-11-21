@@ -43,7 +43,7 @@ class SizeException(BaseException):
 
 class InvalidHeader(BaseException):
     def __init__(self, msg, data):
-        super.__init__(msg)
+        super().__init__(msg)
         self.data = data
 
 
@@ -205,7 +205,7 @@ class MsglenL:
         elif id == b"mh":
             header = MsglenMh._unpackHeader(data)
         else:
-            raise BaseException(f'invalid msglen format: {id}')
+            raise InvalidHeader(f'invalid msglen format: {id}', data)
         if self.trace & trace_head:
             print('read header:', *header)
         return header
@@ -320,15 +320,17 @@ class MsglenL:
         return data, meta
 
     def readermsglenordata(self, read):
-        mread = self.reader(mread)
+        mread = self.reader(read)
 
         async def inner():
             try:
                 data, meta = await mread()
+                print('sucessfully read msgl packet')
             except InvalidHeader as ex:
                 data1 = ex.data
-                data2 = await read.read(1 << 24)
+                data2 = await read(1 << 24)
                 data = data1 + data2
+                meta = dict(raw=1)
             return data, meta
 
         return inner
@@ -340,7 +342,7 @@ class MsglenL:
             if len(datahead) == 0:
                 return None, None
             if len(datahead) < self.totalHeaderSize:
-                raise InvalidHeader(f'read invalid header data: {len(datahead)} B', datahead)
+                raise SizeException(f'read invalid header data: {len(datahead)} B', datahead)
             if self.trace & trace_head:
                 print(f'read header data: {len(datahead)} B')
             headlen, msglen = self.headerInfo(datahead)
