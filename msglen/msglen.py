@@ -42,7 +42,7 @@ class SizeException(BaseException):
 
 
 class InvalidHeader(BaseException):
-    def __init__(self. msg, data):
+    def __init__(self, msg, data):
         super.__init__(msg)
         self.data = data
 
