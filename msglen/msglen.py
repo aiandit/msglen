@@ -347,7 +347,7 @@ class MsglenL:
             if len(datahead) == 0:
                 return None, None
             if len(datahead) < self.totalHeaderSize:
-                raise SizeException(f'read invalid header data: {len(datahead)} B', datahead)
+                raise InvalidHeader(f'invalid msglen format: header too short: {len(datahead)} B', datahead)
             if self.trace & trace_head:
                 print(f'read header data: {len(datahead)} B')
             headlen, msglen = self.headerInfo(datahead)
