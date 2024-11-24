@@ -56,7 +56,12 @@ class MsgMeta:
             self.data = json.dumps(data)
         else:
             self.data = data
-            self._dict = json.loads(self.data)
+            try:
+                self._dict = json.loads(self.data)
+            except json.decoder.JSONDecodeError as ex:
+                print(f'failed to parse JSON meta data: "{self.data}"')
+                self._dict = {}
+                raise ex
 
     def isJSON(self):
         return self.data[0] == '{' or self.data[0] == '['
@@ -382,6 +387,8 @@ class MsglenL:
             inst = MsglenMx()
         elif protocol == 'mh':
             inst = MsglenMh()
+        else:
+            raise ValueError(f'Invalid msgl protocol {protocol}')
         return inst
 
     @classmethod
