@@ -60,6 +60,9 @@ class StdinReader:
     linecallback = None
     endcallback = None
 
+    std_reader = None
+
+
     def __init__(self, datacallback=None, linecallback=None, endcallback=None, verbose=0, **kw):
         self.stdinComplete = asyncio.Condition()
         self.stdinRead = asyncio.Condition()
@@ -80,7 +83,11 @@ class StdinReader:
     def __del__(self):
         pass
 
+    async def start(self, callback=None):
+        self.std_reader, self.std_writer = await connect_stdin_stdout()
+
     async def run(self, callback=None):
+        await self.start()
         await self.readstdin(callback=callback)
 
     async def release(self):
@@ -93,9 +100,6 @@ class StdinReader:
         self.std_writer.close()
 
     async def readstdin(self, callback=None):
-
-        self.std_reader, self.std_writer = await connect_stdin_stdout()
-
         while True:
             if self.std_reader:
                 fr = await readmuch(self.std_reader)
