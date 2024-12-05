@@ -302,6 +302,8 @@ class MsglenL:
         datameta = data[0:headlen]
         databody = data[headlen:]
 
+        if len(databody) != msglen:
+            raise ValueError(f'invalid msglen data, cannot unwrap: {headlen}+{msglen} != {len(data)}')
         assert len(databody) == msglen
 
         if toDict:
