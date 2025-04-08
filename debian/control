@@ -1,7 +1,7 @@
 Source: msglen
 Section: misc
 Priority: optional
-Maintainer: Johannes Willkomm <j.willkomm@fionec.de>
+Maintainer: Johannes Willkomm <j.willkomm@ai-and-it.de>
 Build-Depends: debhelper-compat (= 13), dh-python, python3-all,
  python3-build, pybuild-plugin-pyproject, python3-hatchling
 Standards-Version: 4.5.1
