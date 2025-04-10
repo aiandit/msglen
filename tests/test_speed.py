@@ -1,7 +1,5 @@
 import os
 import sys
-import asyncio
-import struct
 import random
 import math
 import time
@@ -11,7 +9,6 @@ sys.path += ['.']
 
 from msglen import msglen
 
-from test_msglen import checkRes
 
 def test_msglen_proto6():
     data = "Test"

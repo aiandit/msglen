@@ -1,7 +1,4 @@
-import asyncio
-import struct
 import random
-import math
 import os
 import time
 
@@ -89,9 +86,9 @@ def test_msglen_protos_header1():
         print(pr)
         print(header)
 
-        assert(id == inst.msglenId)
-        assert(hlen == len(mhead))
-        assert(mlen == len(data))
+        assert id == inst.msglenId
+        assert hlen == len(mhead)
+        assert mlen == len(data)
 
         assert msg[inst.totalHeaderSize] == b'{'[0]
         assert msg[inst.totalHeaderSize + hlen] == data[0]
@@ -121,9 +118,9 @@ def test_msglen_protos_header2():
         print(pr)
         print(header)
 
-        assert(id == inst.msglenId)
-        assert(hlen == len(mhead))
-        assert(mlen == len(data))
+        assert id == inst.msglenId
+        assert hlen == len(mhead)
+        assert mlen == len(data)
 
         assert msg[inst.totalHeaderSize] == data[0]
         assert len(msg) == inst.totalHeaderSize + hlen + len(data)

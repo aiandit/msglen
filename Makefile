@@ -27,9 +27,11 @@ clean-pyc:
 	find . -name '*~' -exec rm -f {} +
 
 lint:
-	flake8 lib/astunparse tests
+	flake8 --color=never --max-line-length=120 --ignore=F821 msglen
+	flake8 --color=never --max-line-length=120 --ignore=E201,E202,E211,E226,E227,E231,E265,E302,E303,E305,E306,E402,F821,F841 tests
 
 test:
+	./tests/test_cmdline.sh
 	tox
 
 coverage:
@@ -47,3 +49,13 @@ install:
 
 install-dist:
 	$(PIP) install -I $(shell ls -1rt dist/*.whl | tail -n 1)
+
+venv = /var/lib/venvs/test
+CMD=flake8
+venv-run:
+	.  $(venv)/bin/activate && $(CMD)
+
+venv = /var/lib/venvs/test
+GOAL=dist
+venv-make:
+	.  $(venv)/bin/activate && $(MAKE) $(MAKEFLAGS) $(GOAL)

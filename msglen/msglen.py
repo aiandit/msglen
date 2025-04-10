@@ -4,9 +4,9 @@ import math
 import io
 import asyncio
 import binascii
-from inspect import iscoroutinefunction
 
 from astunparse import xml2json, json2xml
+from .stdinreader import ensure_co
 
 protocols = [
     'mx', 'mh',
@@ -27,18 +27,9 @@ trace_meta = 0b010
 trace_data = 0b100
 
 
-def ensure_co(readfunc):
-    if iscoroutinefunction(readfunc):
-        return readfunc
-    else:
-        async def c(*args, **kwargs):
-            return readfunc(*args, **kwargs)
-        return c
-
-
 def getpad(n):
     if n >= 2:
-        res = b' ' * (n-2) + b'\x0d\x0a'
+        res = b' ' * (n - 2) + b'\x0d\x0a'
     elif n >= 1:
         res = b'\x0a'
     else:
@@ -50,6 +41,12 @@ class SizeException(BaseException):
     pass
 
 
+class InvalidHeader(BaseException):
+    def __init__(self, msg, data):
+        super().__init__(msg)
+        self.data = data
+
+
 class MsgMeta:
     def __init__(self, data):
         if isinstance(data, bytes):
@@ -59,7 +56,12 @@ class MsgMeta:
             self.data = json.dumps(data)
         else:
             self.data = data
-            self._dict = json.loads(self.data)
+            try:
+                self._dict = json.loads(self.data)
+            except json.decoder.JSONDecodeError as ex:
+                print(f'failed to parse JSON meta data: "{self.data}"')
+                self._dict = {}
+                raise ex
 
     def isJSON(self):
         return self.data[0] == '{' or self.data[0] == '['
@@ -113,7 +115,6 @@ class MsglenL:
     _meta = {}
 
     file = None
-    reader = None
     header = None
     meta = None
     canSeek = False
@@ -177,7 +178,7 @@ class MsglenL:
 
     @classmethod
     def packHeader(cls, hlen, msglen, flags=0):
-        #print(f'pack header: {cls.__name__}, {cls.msglenId}: ' +
+        # print(f'pack header: {cls.__name__}, {cls.msglenId}: ' +
         # f' data limit {cls.maxDataLength}, actual {msglen}'\
         # f' meta limit {cls.maxMetaLength}, actual {hlen}')
         if hlen >= cls.maxMetaLength:
@@ -189,8 +190,6 @@ class MsglenL:
     @classmethod
     def _packHeader(cls, hlen, msglen, flags=0):
         return cls.headerFmt.pack(cls.msglenId, hlen, msglen, flags)
-
-    msglenImpl = dict()
 
     def headerInfo(self, data):
         header = self.unpackHeader(data)
@@ -211,9 +210,9 @@ class MsglenL:
         elif id == b"mh":
             header = MsglenMh._unpackHeader(data)
         else:
-            raise BaseException(f'invalid msglen format: {id}')
+            raise InvalidHeader(f'invalid msglen format: {id}', data)
         if self.trace & trace_head:
-            print(f'read header:', *header)
+            print('read header:', *header)
         return header
 
     @classmethod
@@ -303,6 +302,8 @@ class MsglenL:
         datameta = data[0:headlen]
         databody = data[headlen:]
 
+        if len(databody) != msglen:
+            raise ValueError(f'invalid msglen data, cannot unwrap: {headlen}+{msglen} != {len(data)}')
         assert len(databody) == msglen
 
         if toDict:
@@ -315,7 +316,7 @@ class MsglenL:
                 meta = MsgMeta(datameta)
 
         if cls.trace & trace_meta:
-            print(f'meta data: ', vars(meta))
+            print('meta data: ', vars(meta))
 
         enc = meta.get('encoding', None)
         if enc:
@@ -325,14 +326,30 @@ class MsglenL:
 
         return data, meta
 
+    def readermsglenordata(self, read):
+        mread = self.reader(read)
+
+        async def inner():
+            try:
+                data, meta = await mread()
+                print('sucessfully read msgl packet')
+            except InvalidHeader as ex:
+                data1 = ex.data
+                data2 = await read(1 << 24)
+                data = data1 + data2
+                meta = dict(raw=1)
+            return data, meta
+
+        return inner
 
     def reader(self, read):
 
         async def inner():
             datahead = await read(self.totalHeaderSize)
-            if len(datahead) == 0: return None, None
+            if len(datahead) == 0:
+                return None, None
             if len(datahead) < self.totalHeaderSize:
-                raise BaseException(f'read invalid header data: {len(datahead)} B')
+                raise InvalidHeader(f'invalid msglen format: header too short: {len(datahead)} B', datahead)
             if self.trace & trace_head:
                 print(f'read header data: {len(datahead)} B')
             headlen, msglen = self.headerInfo(datahead)
@@ -345,10 +362,10 @@ class MsglenL:
 
     def writer(self, writer, meta={}):
         meta_ = meta
-        def inner(data, meta={}):
 
-            data = self.pack(data, meta_|meta)
-            wres = writer.write(data)
+        def inner(data, meta={}):
+            data = self.pack(data, meta_ | meta)
+            writer.write(data)
 
         return inner
 
@@ -372,6 +389,8 @@ class MsglenL:
             inst = MsglenMx()
         elif protocol == 'mh':
             inst = MsglenMh()
+        else:
+            raise ValueError(f'Invalid msgl protocol {protocol}')
         return inst
 
     @classmethod
@@ -440,7 +459,7 @@ class MsglenH(MsglenB):
     def _unpackNumbers(cls, headerd, base=16):
         items = [v for v in headerd.split(' ') if v != '']
         items += ['0'] * (3 - len(items))
-        return [ int(v, base) for v in items ]
+        return [int(v, base) for v in items]
 
     @classmethod
     def _unpackHeader(cls, data):
@@ -461,7 +480,6 @@ class MsglenD(MsglenH):
             headerd += f' {flags:d}'
         headerd = ' ' * (12 - len(headerd)) + headerd
         return cls.headerFmt.pack(cls.msglenId, headerd.encode('utf8'))
-
 
     @classmethod
     def _unpackHeader(cls, data):
@@ -544,7 +562,7 @@ class MsglenMh(MsglenMx):
 
     @classmethod
     def _unpackHeader(cls, data):
-        id, headerb  = cls.headerFmt.unpack(data)
+        id, headerb = cls.headerFmt.unpack(data)
         mlen, hlen, flags = MsglenH._unpackNumbers(headerb.decode('utf8'), base=16)
         return id, hlen, mlen, flags
 

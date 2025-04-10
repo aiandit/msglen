@@ -1,36 +1,17 @@
-import os
 import sys
 import asyncio
 import argparse
 from . import __version__
 from . import __commit__
 
-from .msglen import *
-
-
-async def connect_stdin_stdout():
-    loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-    w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
-    writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
-    return reader, writer
-
-
-async def readtimeout(std_reader, timeout=1e-4):
-    data = b''
-    try:
-        data = await asyncio.wait_for(std_reader.read(10000), timeout)
-    except TimeoutError:
-        data = None
-    return data
+from .msglen import MsglenB, MsglenL
+from .stdinreader import connect_stdin_stdout, readmuch
 
 
 def mkparser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser('msglen',
-                                     '''\
+                                         '''\
 MsgLen CLI tool.
 ''', '')
 
@@ -89,15 +70,15 @@ async def arun(args=None):
 
         while True:
             if std_reader:
-                fr = await readtimeout(std_reader)
+                fr = await readmuch(std_reader)
                 if fr is not None:
-                    res = await callback(fr)
+                    await callback(fr)
                     async with stdinRead:
                         stdinRead.notify()
                     if len(fr) == 0:
                         break
                     if fr.decode('latin1').strip() == 'exit':
-                        res = await callback(b'')
+                        await callback(b'')
                         break
         async with stdinComplete:
             stdinComplete.notify()
@@ -133,7 +114,7 @@ async def arun(args=None):
                 await callback(data)
                 lines = lines[1:]
         if args.verbose:
-            print(f'stdinlinehandler exit')
+            print('stdinlinehandler exit')
 
     async def handleLine_pack(data):
         msg = wrap(data)
@@ -155,34 +136,32 @@ async def arun(args=None):
                 return
             try:
                 write.write(data)
-            except:
+            except BaseException:
                 if isinstance(data, bytes):
                     data = data.decode('utf8')
                     write.write(data)
             outf.flush()
         return inner
 
-
     readstdintask = asyncio.create_task(waitforstdinend())
 
     params = {}
     if args.param:
         params = flatten(args.param)
-        params = { k: v for k,v in [item.split('=') for item in params] }
+        params = {k: v for k, v in [item.split('=') for item in params]}
         if args.verbose:
             print('params:', params)
 
-    wrap = msglenb.packer(dict()|params)
+    wrap = msglenb.packer(dict() | params)
 
     outf = sys.stdout
-    outfname= 'stdout'
+    outfname = 'stdout'
 
     if args.output:
         outf = args.output
         if outf != '-':
             outfname = args.output
             outf = open(outfname, 'wb')
-
 
     if args.verbose > 1:
         print(f'cmd = {args.cmd}')
@@ -216,10 +195,12 @@ async def arun(args=None):
     async with stdinComplete:
         stdinComplete.notify()
 
-    res = await datareader
+    await datareader
+
 
 def run(args=None):
     asyncio.run(arun(args))
+
 
 if __name__ == "__main__":
     run()

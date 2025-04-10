@@ -27,13 +27,13 @@ async def af_atest_msglen_async2_read():
         while True:
             msg, meta = await msgread()
             if msg is None and meta is None:
-                print(f'server: Client disconnected')
+                print('server: Client disconnected')
                 break
             print(f'server: Got client message [{meta}]: {msg}')
             msgwrite(msg)
         writer.close()
         print('server: client task done')
-    print(f'start server')
+    print('start server')
     server = await asyncio.start_server(connected, port=11001)
     print('server: started')
     return server
@@ -180,7 +180,7 @@ def test_msglen_proto1():
     print(res)
     checkRes(res, data, meta)
 
-def test_msglen_proto1():
+def test_msglen_proto1a():
     data = "Grüße, Welt!"
     meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
 

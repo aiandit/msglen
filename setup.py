@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys
 import os
 import re
 from setuptools import setup, find_packages
@@ -12,6 +11,7 @@ def read_version():
         if m:
             return m.group(1)
         raise ValueError("couldn't find version")
+
 
 setup(
     name='msglen',
