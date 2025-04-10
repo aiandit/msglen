@@ -1,3 +1,14 @@
+msglen (25.4-1) unstable; urgency=medium
+
+  * std input reader
+  * Add endcallback and let the taks wait until explicitely released (or forever)
+  * Create version tag upon build
+  * Add cmdline tests
+  * Simplify the read function
+  * New version 25.4
+
+ -- Johannes Willkomm <johannes.willkomm@googlemail.com>  Thu, 10 Apr 2025 18:04:08 +0200
+
 msglen (1.2.0-1) unstable; urgency=medium
 
   * The text format headers store the numbers in the order dlen, mlen, flags
