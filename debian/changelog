@@ -1,3 +1,10 @@
+msglen (25.4.1-1) unstable; urgency=medium
+
+  * Switch to js2x
+  * README updated
+
+ -- Johannes Willkomm <johannes.willkomm@googlemail.com>  Sat, 19 Apr 2025 12:30:17 +0200
+
 msglen (25.4-1) unstable; urgency=medium
 
   * std input reader
