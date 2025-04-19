@@ -121,7 +121,13 @@ async def arun(args=None):
         writeOut(outf)(msg)
 
     async def handleLine_unpack(data):
-        msg, meta = msglenb.unwrap(data)
+        try:
+            msg, meta = msglenb.unwrap(data)
+        except ValueError as ex:
+            msg, meta = None, None
+            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            print(f'msglen infalid data: {data[0:128]}')
+            return
         if args.param:
             print(meta.asJSON())
         elif args.verbose:
