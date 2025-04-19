@@ -5,7 +5,7 @@ import io
 import asyncio
 import binascii
 
-from astunparse import xml2json, json2xml
+from js2x import xml2json, json2xml
 from .stdinreader import ensure_co
 
 protocols = [

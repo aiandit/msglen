@@ -1,2 +1,2 @@
 pytest
-https://github.com/aiandit/astunparse/archive/refs/heads/main.zip
+https://github.com/aiandit/js2x/archive/refs/heads/master.zip
