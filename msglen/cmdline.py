@@ -38,7 +38,7 @@ def flatten(lists):
     return xslt
 
 
-async def arun(args=None):
+async def adoit(args=None):
     if args is None:
         parser = mkparser()
         args = parser.parse_args()
@@ -121,7 +121,13 @@ async def arun(args=None):
         writeOut(outf)(msg)
 
     async def handleLine_unpack(data):
-        msg, meta = msglenb.unwrap(data)
+        try:
+            msg, meta = msglenb.unwrap(data)
+        except ValueError as ex:
+            msg, meta = None, None
+            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            print(f'msglen infalid data: {data[0:128]}')
+            return
         if args.param:
             print(meta.asJSON())
         elif args.verbose:
@@ -190,12 +196,27 @@ async def arun(args=None):
 
     elif args.cmd == "unwrapmsgs" or args.cmd == "unwraplines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
-        await lineradertask
+        try:
+            await lineradertask
+        except asyncio.exceptions.CancelledError as ex:
+            # print(f'lineradertask cancelled: {ex}')
+            raise ex
+            return
 
     async with stdinComplete:
         stdinComplete.notify()
 
     await datareader
+
+
+async def arun(args=None):
+    try:
+        await adoit(args=args)
+    except asyncio.exceptions.CancelledError as ex:
+        # print(f'cmdline program task cancelled: {ex}')
+        pass
+    except BaseException as ex:
+        print(f'cmdline program caught exception: {ex}')
 
 
 def run(args=None):

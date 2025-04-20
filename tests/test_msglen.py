@@ -3,6 +3,7 @@ import asyncio
 import struct
 import random
 import math
+import json
 
 sys.path += ['.']
 
@@ -81,16 +82,16 @@ def test_msglenl3():
 def test_msglenl4():
     data = b"Hallo, Welt!"
     msg = msglenl.pack(data)
-    hlen, = struct.unpack('>l', msg[4:8])
-    mlen, = struct.unpack('>l', msg[8:12])
+    hlen, = struct.unpack('>l', msg[8:12])
+    mlen, = struct.unpack('>l', msg[12:16])
     assert hlen == 0
     assert mlen == len(data)
 
 def test_msglenl5():
     data = b"Hallo, Welt!"
     msg = msglenl.pack(data, {'data': 123})
-    hlen, = struct.unpack('>l', msg[4:8])
-    mlen, = struct.unpack('>l', msg[8:12])
+    hlen, = struct.unpack('>l', msg[8:12])
+    mlen, = struct.unpack('>l', msg[12:16])
     assert hlen > 0
     assert mlen == len(data)
     assert len(msg) % 8 == len(data) % 8
@@ -241,6 +242,83 @@ def test_msglen_proto6():
     res = unwrap(msg)
     print(res)
     checkRes(res, data, meta)
+
+def test_msglen_layout_mx():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='latin1',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.createwrappers('mx')
+    opts = 0x11
+    msg = pack(data, meta, opts)
+    print(msg)
+
+    (b_magic, b_flags, b_meta, b_data) = struct.unpack('> 2s 1s 2s 3s', msg[0:8])
+
+    assert b_magic == b'mx'
+    assert struct.unpack('> H', b'\x00' + b_flags)[0] == opts
+    assert struct.unpack('> H', b_meta)[0] == 56
+    assert struct.unpack('> L', b'\x00' + b_data)[0] == 12
+
+    assert json.dumps(meta) == json.dumps(json.loads(msg[8:8+56].decode('utf8')))
+    assert data == msg[8+56:].decode('latin1')
+
+    res = unwrap(msg)
+    print(res)
+    # the reader sets the flags entries from the flags field
+    metares = meta | {"flag00": 1, 'flag04': 1}
+    checkRes(res, data, metares)
+
+
+def test_msglen_layout_msgl():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.createwrappers('msgl')
+    opts = 0x11
+    msg = pack(data, meta, opts)
+    print(msg)
+
+    (b_magic, b_flags, b_meta, b_data) = struct.unpack('> 4s 4s 4s 4s', msg[0:16])
+
+    assert b_magic == b'msgl'
+    assert struct.unpack('> L', b_flags)[0] == opts
+    assert struct.unpack('> L', b_meta)[0] == 56
+    assert struct.unpack('> L', b_data)[0] == 14
+
+    assert json.dumps(meta) == json.dumps(json.loads(msg[16:16+56].decode('utf8')))
+    assert data == msg[16+56:].decode('utf8')
+
+    res = unwrap(msg)
+    print(res)
+    # the reader sets the flags entries from the flags field
+    metares = meta | {"flag00": 1, 'flag04': 1}
+    checkRes(res, data, metares)
+
+
+def test_msglen_layout_Msgl():
+    data = "Grüße, Welt!"
+    meta = dict(encoding='utf8',a=dict(f=1,g=2,h=3))
+
+    pack, unwrap = msglen.createwrappers('Msgl')
+    opts = 0x11
+    msg = pack(data, meta, opts)
+    print(msg)
+
+    (b_magic, b_flags, b_meta, b_data) = struct.unpack('> 4s 4s 8s 8s', msg[0:24])
+
+    assert b_magic == b'Msgl'
+    assert struct.unpack('> L', b_flags)[0] == opts
+    assert struct.unpack('> Q', b_meta)[0] == 56
+    assert struct.unpack('> Q', b_data)[0] == 14
+
+    assert json.dumps(meta) == json.dumps(json.loads(msg[24:24+56].decode('utf8')))
+    assert data == msg[24+56:].decode('utf8')
+
+    res = unwrap(msg)
+    print(res)
+    # the reader sets the flags entries from the flags field
+    metares = meta | {"flag00": 1, 'flag04': 1}
+    checkRes(res, data, metares)
 
 
 if __name__ == "__main__":
