@@ -1,3 +1,12 @@
+msglen (25.4.2-1) unstable; urgency=medium
+
+  * Catch exception from invalid msgs
+  * Catch CancelledError (keyboard interupt) in CLI readers
+  * Change order of header fields in msgl and msgb to the standard flags, meta, data
+  * Readme updated
+
+ -- Johannes Willkomm <johannes.willkomm@googlemail.com>  Sun, 20 Apr 2025 18:02:27 +0200
+
 msglen (25.4.1-1) unstable; urgency=medium
 
   * Switch to js2x
