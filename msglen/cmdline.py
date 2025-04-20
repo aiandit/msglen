@@ -38,7 +38,7 @@ def flatten(lists):
     return xslt
 
 
-async def arun(args=None):
+async def adoit(args=None):
     if args is None:
         parser = mkparser()
         args = parser.parse_args()
@@ -196,12 +196,27 @@ async def arun(args=None):
 
     elif args.cmd == "unwrapmsgs" or args.cmd == "unwraplines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
-        await lineradertask
+        try:
+            await lineradertask
+        except asyncio.exceptions.CancelledError as ex:
+            # print(f'lineradertask cancelled: {ex}')
+            raise ex
+            return
 
     async with stdinComplete:
         stdinComplete.notify()
 
     await datareader
+
+
+async def arun(args=None):
+    try:
+        await adoit(args=args)
+    except asyncio.exceptions.CancelledError as ex:
+        # print(f'cmdline program task cancelled: {ex}')
+        pass
+    except BaseException as ex:
+        print(f'cmdline program caught exception: {ex}')
 
 
 def run(args=None):
