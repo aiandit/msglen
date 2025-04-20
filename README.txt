@@ -5,7 +5,7 @@
                        ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-                               2025-04-19
+                               2025-04-20
 
 
 Table of Contents
@@ -66,44 +66,81 @@ Table of Contents
 ──────────────────
 
   The family of MsgLen protocols is defined by its headers, of which
-  there are three:
+  there are three. In binary formats, the three relevant fields are
+  given in the order as in the table, in decimal or hex formats, they
+  are given in reverse order. Also for binary formats, /mx/, /msgl/, and
+  /Msgl/, the tables show the provision of bytes for the relevant
+  fields, which are big endian unsigned integers:
 
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   Name  Magic         Flags  MetaLength  HeaderLength  Total 
+   Name  Magic         Flags  Meta Length  Data Length  Total 
   ────────────────────────────────────────────────────────────
-   mx    m [xh]        1 B    2 B         3 B           8 B   
-   msgl  m s g [lbhd]  4 B    4 B         4 B           16 B  
-   Msgl  M s g [lbhd]  4 B    8 B         8 B           24 B  
+   mx    m [xh]        1 B    2 B          3 B          8 B   
+   msgl  m s g [lbhd]  4 B    4 B          4 B          16 B  
+   Msgl  M s g [lbhd]  4 B    8 B          8 B          24 B  
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   The /mx/ protocol family has just two members, one binary format and
-  one ASCII variant:
+  one ASCII variant. The binary format /mx/ uses the following
+  layout. It provides 8 bits for flags, 16 bits for the meta length and
+  24 bits for the data length.
 
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   Name  Format      0-1  2      3-4     5-7    
-  ──────────────────────────────────────────────
-   mx    binary      x m  8 bit  16 bit  24 bit 
-   mh    ASCII hex.  x h  4 bit  8 bit   12 bit 
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Name  Format  0-1    2      3-4          5-7         
+  ──────────────────────────────────────────────────────
+                 Magic  Flags  Meta Length  Data Length 
+  ──────────────────────────────────────────────────────
+   mx    binary  m x    8 bit  16 bit       24 bit      
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  This provides 8 bits for flags, usually all zeros, 16 bits for the
-  meta length and 24 bits for the data length.
+  In the case of the ASCII format /mh/, between one and three
+  hexadecimal numbers are given in the order data length, meta length,
+  flags. Whitespace must be used for padding and for separating the
+  numbers. Trailing numbers can be omitted and are then considered as
+  zero. The maximum data length is thus achieved when meta length and
+  flags are not given, with 6 bytes. The maximum meta length is achieved
+  when the data length is zero (or a single digit) and flags are not
+  given, leaving 4 bytes for a hex number.
 
-  The /msgl/ protocol family has one binary format and three variants
-  which result in a pure ASCII header. It provides in the binary format
-  32 bits for flags, 32 bits for the meta length and 32 bits for the
-  data length:
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Name  Format      0-1    2–7                              
+  ───────────────────────────────────────────────────────────
+                     Magic  Data Length, Meta Length, Flags  
+  ───────────────────────────────────────────────────────────
+   mh    ASCII hex.  m h    max 24 bit data, max 16 bit meta 
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  The /msgl/ protocol family has one binary format /msgl/ and three
+  variants which result in a pure ASCII header. It provides in the
+  binary format 32 bits for flags, 32 bits for the meta length and 32
+  bits for the data length. In the case of the first ascii format /msgb/
+  the same binary layout is used to encode lengths as base64, which
+  results in a factor of 3/4 in the number of bits per field.
 
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   Name  Format        0-3      4-7          8-11         12-15  
+   Name  Format        0-3      4-7     8-11         12-15       
   ───────────────────────────────────────────────────────────────
-                       Magic    Meta-Length  Data-Length  Flags  
+                       Magic    Flags   Meta Length  Data Length 
   ───────────────────────────────────────────────────────────────
-   msgl  binary        m s g l  32 bit       32 bit       32 bit 
-   msgb  ASCII base64  m s g b  24 bit       24 bit       24 bit 
-   msgh  ASCII hex.    m s g h  16 bit       16 bit       16 bit 
-   msgd  ASCII dec.    m s g d  0-9999       0-9999       13 bit 
+   msgl  binary        m s g l  32 bit  32 bit       32 bit      
+   msgb  ASCII base64  m s g b  24 bit  24 bit       24 bit      
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  In the case of the ASCII format /msgh/ and /msgd/, between one and
+  three hexadecimal or decimal numbers are given. The maximum data
+  length is thus achieved when meta length and flags are not given, with
+  12 bytes. The maximum meta length is achieved when the data length is
+  zero (or a single digit) and flags are not given, leaving 10 bytes for
+  a hex or decimal number.
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Name  Format      0-3      4–15                             
+  ─────────────────────────────────────────────────────────────
+                     Magic    Data Length, Meta Length, Flags  
+  ─────────────────────────────────────────────────────────────
+   msgh  ASCII hex.  m s g h  max 48 bit data, max 40 bit meta 
+   msgd  ASCII dec.  m s g d  max 10^12 data, max 10^10 meta   
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   The /Msgl/ protocol family has one binary format and three variants
   with a pure ASCII header. It provides in the binary format 32 bits for
@@ -116,19 +153,29 @@ Table of Contents
   ───────────────────────────────────────────────────────────────
    Msgl  binary        M s g l  32 bit  64 bit       64 bit      
    Msgb  ASCII base64  M s g b  24 bit  48 bit       48 bit      
-   Msgh  ASCII hex.    M s g h  16 bit  32 bit       32 bit      
-   Msgd  ASCII dec.    M s g d  13 bit  0-99999999   0-99999999  
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  In the case of the ASCII formats, the maximum data length is achieved
+  when meta length and flags are not given, with 20 bytes. The maximum
+  meta length is achieved when the data length is zero (or a single
+  digit) and flags is not given, leaving 18 bytes for a hex or decimal
+  number. Some of the resulting numbers may be larger than the maximum
+  64 bit unsigned value.
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Name  Format      0-3      4–23                             
+  ─────────────────────────────────────────────────────────────
+                     Magic    Data-Length, Meta-Length, Flags  
+  ─────────────────────────────────────────────────────────────
+   Msgh  ASCII hex.  M s g h  max 80 bit data, max 72 bit meta 
+   Msgd  ASCII dec.  M s g d  max 10^20 data, max 10^18 meta   
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Currently there are no flags specified, they are usually all zeros.
   The hope is all of the requirements regarding the transport and
   protocol can be placed in the meta information. When flags are added
   in the future, the most important flags should be placed in the lower
   bits.
-
-  In the case of the ASCII formats, whitespace must be used for
-  padding. Also, pure whitespace in the flags fields must be interpreted
-  as the flags being all zero.
 
   Note that, when the ASCII header forms are used, and the meta
   information is not compressed, and the data is UTF-8 encoded, then the
