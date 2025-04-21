@@ -213,12 +213,8 @@ async def adoit(args=None):
 
     elif args.cmd == "unwrapmsgs" or args.cmd == "unwraplines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
-        try:
-            await lineradertask
-        except asyncio.exceptions.CancelledError as ex:
-            # print(f'lineradertask cancelled: {ex}')
-            raise ex
-            return
+        await lineradertask
+
 
     async with stdinComplete:
         stdinComplete.notify()
