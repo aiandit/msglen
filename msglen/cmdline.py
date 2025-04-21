@@ -16,6 +16,10 @@ MsgLen CLI tool.
 ''', '')
 
     parser.add_argument('-m', '--message', metavar='S', type=str, nargs='?', action='append')
+    parser.add_argument('-n', '--num-lines', metavar='N', nargs='?', type=int, const=10)
+    parser.add_argument('-l', '--lines', action='store_true')
+    parser.add_argument('-d', '--decode', action='store_true')
+    parser.add_argument('-u', '--unwrap', action='store_true')
     parser.add_argument('-p', '--protocol', metavar='N', nargs='?', type=str, default='msgl')
     parser.add_argument('-s', '--param', metavar='N=V', type=str, nargs='*', action='append')
     parser.add_argument('-o', '--output', metavar='FILE', type=str)
@@ -23,7 +27,7 @@ MsgLen CLI tool.
                         help='show %(prog)s\'s version number and exit')
     parser.add_argument('-v', '--verbose', type=int, metavar='N', nargs='?', const=1, default=0)
 
-    parser.add_argument('cmd', metavar='CMD', type=str)
+    parser.add_argument('cmd', metavar='CMD', type=str, nargs='?')
 
     return parser
 
@@ -96,15 +100,18 @@ async def adoit(args=None):
         if args.verbose > 2:
             print(f'got whole input! {data}')
 
-    async def stdinlinehandler(callback):
+    async def stdinlinehandler(callback, maxlines=None):
         nonlocal lines
         stop = False
-        while not stop:
+        nlines = 0
+        while maxlines is None or nlines < maxlines:
             if args.verbose > 1:
                 print('wait for stdin read')
             async with stdinRead:
                 await stdinRead.wait()
             while len(lines) > 0:
+                if maxlines is not None and nlines > maxlines:
+                    break
                 data = lines[0]
                 if args.verbose > 1:
                     print(f'got {len(lines)} input lines: {data}')
@@ -113,6 +120,7 @@ async def adoit(args=None):
                     break
                 await callback(data)
                 lines = lines[1:]
+                nlines += 1
         if args.verbose:
             print('stdinlinehandler exit')
 
@@ -189,6 +197,15 @@ async def adoit(args=None):
 
         if (args.param is None and not args.message) or (args.message):
             writeOut(outf)(msg)
+
+    elif args.lines:
+        lineradertask = asyncio.create_task(
+            stdinlinehandler(
+                handleLine_unpack if args.unwrap or args.decode else handleLine_pack,
+                maxlines = args.num_lines
+            )
+        )
+        await lineradertask
 
     elif args.cmd == "wraplines" or args.cmd == "readlines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_pack))
