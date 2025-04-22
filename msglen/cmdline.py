@@ -53,13 +53,14 @@ async def adoit(args=None):
 
     msglenb = msgType
 
-    stdinComplete = asyncio.Condition()
+    stdinComplete = asyncio.Event()
+    stdinClose = asyncio.Event()
     stdinRead = asyncio.Condition()
 
     data = b''
     lines = []
 
-    async def readstdin(callback=None):
+    async def readstdin(std_reader, std_writer, callback=None):
         nonlocal data, lines
 
         if callback is None:
@@ -70,9 +71,7 @@ async def adoit(args=None):
 
             callback = dataadd
 
-        std_reader, std_writer = await connect_stdin_stdout()
-
-        while True:
+        while not stdinClose.is_set():
             if std_reader:
                 fr = await readmuch(std_reader)
                 if fr is not None:
@@ -84,19 +83,19 @@ async def adoit(args=None):
                     if fr.decode('latin1').strip() == 'exit':
                         await callback(b'')
                         break
-        async with stdinComplete:
-            stdinComplete.notify()
-        async with stdinComplete:
-            await stdinComplete.wait()
+
+        await stdinClose.wait()
+
         return data
 
-    datareader = asyncio.create_task(readstdin())
+
+    std_reader, std_writer = await connect_stdin_stdout()
+    datareader = asyncio.create_task(readstdin(std_reader, std_writer))
 
     async def waitforstdinend():
         if args.verbose > 1:
             print('wait for stdin read end')
-        async with stdinComplete:
-            await stdinComplete.wait()
+        await stdinComplete.wait()
         if args.verbose > 2:
             print(f'got whole input! {data}')
 
@@ -157,7 +156,7 @@ async def adoit(args=None):
             outf.flush()
         return inner
 
-    readstdintask = asyncio.create_task(waitforstdinend())
+    waitforstdinendtask = asyncio.create_task(waitforstdinend())
 
     params = {}
     if args.param:
@@ -181,13 +180,13 @@ async def adoit(args=None):
         print(f'cmd = {args.cmd}')
 
     if args.cmd == "wrap":
-        await readstdintask
+        await waitforstdinendtask
         wrap = msglenb.packer(params)
         msg = wrap(data)
         writeOut(outf)(msg)
 
     elif args.cmd == "unwrap":
-        await readstdintask
+        await waitforstdinendtask
         wrap = msglenb.unwrap(data)
         msg, meta = wrap
         if args.param:
@@ -215,11 +214,13 @@ async def adoit(args=None):
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
         await lineradertask
 
+    stdinComplete.set()
+    stdinClose.set()
 
-    async with stdinComplete:
-        stdinComplete.notify()
+    await asyncio.gather(*[waitforstdinendtask, datareader])
 
-    await datareader
+    #std_info[0].close()
+    #std_info[2].close()
 
 
 async def arun(args=None):
