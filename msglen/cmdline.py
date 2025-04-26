@@ -71,9 +71,15 @@ async def adoit(args=None):
 
             callback = dataadd
 
-        while not stdinClose.is_set():
+        count = 0
+
+        while count < 1 or not stdinClose.is_set():
+            count += 1
             if std_reader:
                 fr = await readmuch(std_reader)
+                if args.verbose:
+                    print(f'readstdin: {len(fr)} B')
+
                 if fr is not None:
                     await callback(fr)
                     async with stdinRead:
@@ -85,6 +91,9 @@ async def adoit(args=None):
                         break
 
         await stdinClose.wait()
+
+        if args.verbose:
+            print('readstdin exit')
 
         return data
 
@@ -143,6 +152,23 @@ async def adoit(args=None):
         if (args.param is None and not args.message) or (args.message):
             writeOut(outf)(msg)
 
+    async def handleLine_repack(data):
+        try:
+            msg, meta = msglenb.unwrap(data)
+        except ValueError as ex:
+            msg, meta = None, None
+            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            print(f'msglen infalid data: {data[0:128]}')
+            return
+        if args.param:
+            print(meta.asJSON())
+        elif args.verbose:
+            print('meta:', meta)
+
+        rmsg = wrap(msg, vars(meta))
+        writeOut(outf)(rmsg)
+
+
     def writeOut(write):
         def inner(data):
             if write.closed:
@@ -153,7 +179,7 @@ async def adoit(args=None):
                 if isinstance(data, bytes):
                     data = data.decode('utf8')
                     write.write(data)
-            outf.flush()
+            write.flush()
         return inner
 
     waitforstdinendtask = asyncio.create_task(waitforstdinend())
@@ -180,7 +206,8 @@ async def adoit(args=None):
         print(f'cmd = {args.cmd}')
 
     if args.cmd == "wrap":
-        await waitforstdinendtask
+        stdinClose.set()
+        await datareader
         wrap = msglenb.packer(params)
         msg = wrap(data)
         writeOut(outf)(msg)
@@ -214,10 +241,26 @@ async def adoit(args=None):
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
         await lineradertask
 
+    elif args.cmd == "head":
+        lineradertask = asyncio.create_task(
+            stdinlinehandler(
+                handleLine_repack,
+                maxlines = args.num_lines
+            )
+        )
+        await lineradertask
+
     stdinComplete.set()
     stdinClose.set()
 
-    await asyncio.gather(*[waitforstdinendtask, datareader])
+    if args.verbose:
+        print('cancel datareader')
+    datareader.cancel()
+
+    await asyncio.gather(*[waitforstdinendtask, datareader], return_exceptions=True)
+
+    if args.verbose:
+        print('msgl command exit')
 
     #std_info[0].close()
     #std_info[2].close()
@@ -231,6 +274,7 @@ async def arun(args=None):
         pass
     except BaseException as ex:
         print(f'cmdline program caught exception: {ex}')
+        raise ex
 
 
 def run(args=None):
