@@ -473,7 +473,7 @@ class MsglenH(MsglenB):
             headerd += f' {hlen:x}'
         if flags != 0:
             headerd += f' {flags:x}'
-        headerd = ' ' * (12 - len(headerd)) + headerd
+        headerd = ' ' * (11 - len(headerd)) + headerd + (' ' if len(headerd) < 12 else '')
         return cls.headerFmt.pack(cls.msglenId, headerd.encode('utf8'))
 
     @classmethod
@@ -499,7 +499,7 @@ class MsglenD(MsglenH):
             headerd += f' {hlen:d}'
         if flags != 0:
             headerd += f' {flags:d}'
-        headerd = ' ' * (12 - len(headerd)) + headerd
+        headerd = ' ' * (11 - len(headerd)) + headerd + (' ' if len(headerd) < 12 else '')
         return cls.headerFmt.pack(cls.msglenId, headerd.encode('utf8'))
 
     @classmethod
@@ -577,7 +577,7 @@ class MsglenMh(MsglenMx):
             headerd += f' {hlen:x}'
         if flags != 0:
             headerd += f' {flags:x}'
-        headerd = ' ' * (6 - len(headerd)) + headerd
+        headerd = ' ' * (5 - len(headerd)) + headerd + (' ' if len(headerd) < 6 else '')
         data = cls.headerFmt.pack(cls.msglenId, headerd.encode('utf8'))
         return data
 
