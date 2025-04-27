@@ -118,7 +118,7 @@ async def adoit(args=None):
             async with stdinRead:
                 await stdinRead.wait()
             while len(lines) > 0:
-                if maxlines is not None and nlines > maxlines:
+                if maxlines is not None and nlines >= maxlines:
                     break
                 data = lines[0]
                 if args.verbose > 1:
