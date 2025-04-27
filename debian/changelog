@@ -1,3 +1,12 @@
+msglen (25.4.3-1) unstable; urgency=medium
+
+  * New cmdline options
+  * Use gather, use Events instead of Condition
+  * Add space after last number if possible
+  * Add head (repack n items) command, fix wrap command
+
+ -- Johannes Willkomm <johannes.willkomm@googlemail.com>  Sun, 27 Apr 2025 19:58:00 +0200
+
 msglen (25.4.2-1) unstable; urgency=medium
 
   * Catch exception from invalid msgs
