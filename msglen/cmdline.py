@@ -16,6 +16,10 @@ MsgLen CLI tool.
 ''', '')
 
     parser.add_argument('-m', '--message', metavar='S', type=str, nargs='?', action='append')
+    parser.add_argument('-n', '--num-lines', metavar='N', nargs='?', type=int, const=10)
+    parser.add_argument('-l', '--lines', action='store_true')
+    parser.add_argument('-d', '--decode', action='store_true')
+    parser.add_argument('-u', '--unwrap', action='store_true')
     parser.add_argument('-p', '--protocol', metavar='N', nargs='?', type=str, default='msgl')
     parser.add_argument('-s', '--param', metavar='N=V', type=str, nargs='*', action='append')
     parser.add_argument('-o', '--output', metavar='FILE', type=str)
@@ -23,7 +27,7 @@ MsgLen CLI tool.
                         help='show %(prog)s\'s version number and exit')
     parser.add_argument('-v', '--verbose', type=int, metavar='N', nargs='?', const=1, default=0)
 
-    parser.add_argument('cmd', metavar='CMD', type=str)
+    parser.add_argument('cmd', metavar='CMD', type=str, nargs='?')
 
     return parser
 
@@ -49,13 +53,14 @@ async def adoit(args=None):
 
     msglenb = msgType
 
-    stdinComplete = asyncio.Condition()
+    stdinComplete = asyncio.Event()
+    stdinClose = asyncio.Event()
     stdinRead = asyncio.Condition()
 
     data = b''
     lines = []
 
-    async def readstdin(callback=None):
+    async def readstdin(std_reader, std_writer, callback=None):
         nonlocal data, lines
 
         if callback is None:
@@ -66,11 +71,15 @@ async def adoit(args=None):
 
             callback = dataadd
 
-        std_reader, std_writer = await connect_stdin_stdout()
+        count = 0
 
-        while True:
+        while count < 1 or not stdinClose.is_set():
+            count += 1
             if std_reader:
                 fr = await readmuch(std_reader)
+                if args.verbose:
+                    print(f'readstdin: {len(fr)} B')
+
                 if fr is not None:
                     await callback(fr)
                     async with stdinRead:
@@ -80,31 +89,37 @@ async def adoit(args=None):
                     if fr.decode('latin1').strip() == 'exit':
                         await callback(b'')
                         break
-        async with stdinComplete:
-            stdinComplete.notify()
-        async with stdinComplete:
-            await stdinComplete.wait()
+
+        await stdinClose.wait()
+
+        if args.verbose:
+            print('readstdin exit')
+
         return data
 
-    datareader = asyncio.create_task(readstdin())
+
+    std_reader, std_writer = await connect_stdin_stdout()
+    datareader = asyncio.create_task(readstdin(std_reader, std_writer))
 
     async def waitforstdinend():
         if args.verbose > 1:
             print('wait for stdin read end')
-        async with stdinComplete:
-            await stdinComplete.wait()
+        await stdinComplete.wait()
         if args.verbose > 2:
             print(f'got whole input! {data}')
 
-    async def stdinlinehandler(callback):
+    async def stdinlinehandler(callback, maxlines=None):
         nonlocal lines
         stop = False
-        while not stop:
+        nlines = 0
+        while maxlines is None or nlines < maxlines:
             if args.verbose > 1:
                 print('wait for stdin read')
             async with stdinRead:
                 await stdinRead.wait()
             while len(lines) > 0:
+                if maxlines is not None and nlines >= maxlines:
+                    break
                 data = lines[0]
                 if args.verbose > 1:
                     print(f'got {len(lines)} input lines: {data}')
@@ -113,6 +128,7 @@ async def adoit(args=None):
                     break
                 await callback(data)
                 lines = lines[1:]
+                nlines += 1
         if args.verbose:
             print('stdinlinehandler exit')
 
@@ -136,6 +152,23 @@ async def adoit(args=None):
         if (args.param is None and not args.message) or (args.message):
             writeOut(outf)(msg)
 
+    async def handleLine_repack(data):
+        try:
+            msg, meta = msglenb.unwrap(data)
+        except ValueError as ex:
+            msg, meta = None, None
+            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            print(f'msglen infalid data: {data[0:128]}')
+            return
+        if args.param:
+            print(meta.asJSON())
+        elif args.verbose:
+            print('meta:', meta)
+
+        rmsg = wrap(msg, vars(meta))
+        writeOut(outf)(rmsg)
+
+
     def writeOut(write):
         def inner(data):
             if write.closed:
@@ -146,10 +179,10 @@ async def adoit(args=None):
                 if isinstance(data, bytes):
                     data = data.decode('utf8')
                     write.write(data)
-            outf.flush()
+            write.flush()
         return inner
 
-    readstdintask = asyncio.create_task(waitforstdinend())
+    waitforstdinendtask = asyncio.create_task(waitforstdinend())
 
     params = {}
     if args.param:
@@ -173,13 +206,14 @@ async def adoit(args=None):
         print(f'cmd = {args.cmd}')
 
     if args.cmd == "wrap":
-        await readstdintask
+        stdinClose.set()
+        await datareader
         wrap = msglenb.packer(params)
         msg = wrap(data)
         writeOut(outf)(msg)
 
     elif args.cmd == "unwrap":
-        await readstdintask
+        await waitforstdinendtask
         wrap = msglenb.unwrap(data)
         msg, meta = wrap
         if args.param:
@@ -190,23 +224,46 @@ async def adoit(args=None):
         if (args.param is None and not args.message) or (args.message):
             writeOut(outf)(msg)
 
+    elif args.lines:
+        lineradertask = asyncio.create_task(
+            stdinlinehandler(
+                handleLine_unpack if args.unwrap or args.decode else handleLine_pack,
+                maxlines = args.num_lines
+            )
+        )
+        await lineradertask
+
     elif args.cmd == "wraplines" or args.cmd == "readlines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_pack))
         await lineradertask
 
     elif args.cmd == "unwrapmsgs" or args.cmd == "unwraplines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
-        try:
-            await lineradertask
-        except asyncio.exceptions.CancelledError as ex:
-            # print(f'lineradertask cancelled: {ex}')
-            raise ex
-            return
+        await lineradertask
 
-    async with stdinComplete:
-        stdinComplete.notify()
+    elif args.cmd == "head":
+        lineradertask = asyncio.create_task(
+            stdinlinehandler(
+                handleLine_repack,
+                maxlines = args.num_lines
+            )
+        )
+        await lineradertask
 
-    await datareader
+    stdinComplete.set()
+    stdinClose.set()
+
+    if args.verbose:
+        print('cancel datareader')
+    datareader.cancel()
+
+    await asyncio.gather(*[waitforstdinendtask, datareader], return_exceptions=True)
+
+    if args.verbose:
+        print('msgl command exit')
+
+    #std_info[0].close()
+    #std_info[2].close()
 
 
 async def arun(args=None):
@@ -217,6 +274,7 @@ async def arun(args=None):
         pass
     except BaseException as ex:
         print(f'cmdline program caught exception: {ex}')
+        raise ex
 
 
 def run(args=None):

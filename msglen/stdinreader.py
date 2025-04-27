@@ -1,3 +1,4 @@
+import os
 import sys
 import asyncio
 import argparse
@@ -5,6 +6,39 @@ from inspect import iscoroutinefunction
 from . import __version__
 from . import __commit__
 from . import log
+
+
+class MyWriter(asyncio.Protocol):
+    def __init__(self):
+        self.transport = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+        print('Connected')
+
+    def data_received(self, data):
+        print('Received:', data.decode())
+
+    def connection_lost(self, exc):
+        print('Connection lost')
+
+
+class MyReader(asyncio.Protocol):
+    def __init__(self, reader, loop=None):
+        self.transport = None
+        self.reader = reader
+        self.loop = loop
+
+    def connection_made(self, transport):
+        self.transport = transport
+        print('Connected')
+
+    def data_received(self, data):
+        print('Received:', data.decode())
+        return data.decode()
+
+    def connection_lost(self, exc):
+        print('Connection lost')
 
 
 def ensure_co(readfunc):
@@ -16,13 +50,37 @@ def ensure_co(readfunc):
         return c
 
 
+
+async def connect_stdin_stdoutn(limit=asyncio.streams._DEFAULT_LIMIT, loop=None):
+    if loop is None:
+        loop = asyncio.get_event_loop()
+
+    if sys.platform == 'win32':
+        return _win32_stdio(loop)
+
+    reader = asyncio.StreamReader(limit=limit, loop=loop)
+    await loop.connect_read_pipe(
+        lambda: asyncio.StreamReaderProtocol(reader, loop=loop),
+        sys.stdin)
+
+    writer_transport, writer_protocol = await loop.connect_write_pipe(
+        lambda: asyncio.streams.FlowControlMixin(loop=loop),
+        os.fdopen(sys.stdout.fileno(), 'wb'))
+    writer = asyncio.streams.StreamWriter(
+        writer_transport, writer_protocol, None, loop)
+
+    return reader, writer
+
+
+
 async def connect_stdin_stdout():
     loop = asyncio.get_event_loop()
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+    r_transport, r_protocol = await loop.connect_read_pipe(lambda: protocol, sys.stdin)
     w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
     writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
+    #return reader, writer, (r_transport, r_protocol, w_transport, w_protocol)
     return reader, writer
 
 
