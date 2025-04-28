@@ -1,12 +1,14 @@
 import sys
 import asyncio
 import argparse
+import aiaio
+
 from . import __version__
 from . import __commit__
 
 from .msglen import MsglenB, MsglenL
 from .stdinreader import connect_stdin_stdout, readmuch
-
+from . import log
 
 def mkparser(parser=None):
     if parser is None:
@@ -18,6 +20,7 @@ MsgLen CLI tool.
     parser.add_argument('-m', '--message', metavar='S', type=str, nargs='?', action='append')
     parser.add_argument('-n', '--num-lines', metavar='N', nargs='?', type=int, const=10)
     parser.add_argument('-l', '--lines', action='store_true')
+    parser.add_argument('-c', '--count', action='store_true')
     parser.add_argument('-d', '--decode', action='store_true')
     parser.add_argument('-u', '--unwrap', action='store_true')
     parser.add_argument('-r', '--rewrap', action='store_true')
@@ -75,7 +78,7 @@ async def adoit(args=None):
             if std_reader:
                 fr = await readmuch(std_reader)
                 if args.verbose:
-                    print(f'readstdin: {len(fr)} B')
+                    log.log(f'readstdin: {len(fr)} B')
 
                 if fr is not None:
                     await callback(fr)
@@ -90,7 +93,7 @@ async def adoit(args=None):
         stdinClose.set()
 
         if args.verbose:
-            print('readstdin exit')
+            log.log('readstdin exit')
 
         return data
 
@@ -104,13 +107,13 @@ async def adoit(args=None):
         nlines = 0
         while not stop and (maxlines is None or nlines < maxlines):
             if args.verbose > 1:
-                print(f'{len(lines)} lines available')
+                log.log(f'{len(lines)} lines available')
             if len(lines) == 0:
                 if stdinClose.is_set():
                     break
                 else:
                     if args.verbose > 1:
-                        print('wait for stdin read')
+                        log.log('wait for stdin read')
                     async with stdinRead:
                         await stdinRead.wait()
             while len(lines) > 0:
@@ -118,7 +121,8 @@ async def adoit(args=None):
                     break
                 data = lines[0]
                 if args.verbose > 1:
-                    print(f'got {len(lines)} input lines: {data}')
+                    log.log(f'got {len(lines)} input lines')
+                    log.log(f'first line: {data[0:16]} ({len(data)} B)')
                 if len(data) == 0:
                     stop = True
                     break
@@ -126,56 +130,67 @@ async def adoit(args=None):
                 lines = lines[1:]
                 nlines += 1
         if args.verbose:
-            print('stdinlinehandler exit')
+            log.log('stdinlinehandler exit')
 
     async def handleLine_pack(data):
         msg = wrap(data)
-        writeOut(outf)(msg)
+        await (writeOut(outf))(msg)
 
     async def handleLine_unpack(data):
         try:
             msg, meta = msglenb.unwrap(data)
         except ValueError as ex:
             msg, meta = None, None
-            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
-            print(f'msglen infalid data: {data[0:128]}')
+            log.log(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            log.log(f'msglen invalid data: {data[0:128]}')
             return
         if args.param:
-            print(meta.asJSON())
+            log.log(meta.asJSON())
         elif args.verbose:
-            print('meta:', meta)
+            log.log('meta:', meta)
 
         if (args.param is None and not args.message) or (args.message):
-            writeOut(outf)(msg)
+            await (writeOut(outf))(msg)
 
     async def handleLine_repack(data):
         try:
             msg, meta = msglenb.unwrap(data)
         except ValueError as ex:
             msg, meta = None, None
-            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
-            print(f'msglen infalid data: {data[0:128]}')
+            log.log(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            log.log(f'msglen invalid data: {data[0:128]}')
             return
         if args.param:
-            print(meta.asJSON())
+            log.log(meta.asJSON())
         elif args.verbose:
-            print('meta:', meta)
+            log.log('meta:', meta)
 
         rmsg = wrap(msg, vars(meta))
-        writeOut(outf)(rmsg)
+        await (writeOut(outf))(rmsg)
 
 
+    msgcount = dict(count=0,rawbytes=0,bytes=0,errors=0,errbytes=0)
+    async def handleLine_count(data):
+        msgcount['rawbytes'] += len(data)
+        try:
+            msg, meta = msglenb.unwrap(data)
+            msgcount['count'] += 1
+            msgcount['bytes'] += len(msg)
+        except ValueError as ex:
+            msgcount['errors'] += 1
+            msgcount['errbytes'] += len(data)
+            msg, meta = None, None
+            log.log(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
+            log.log(f'msglen invalid data: {data[0:128]}')
+            return
+
+
+    nwrt = 0
     def writeOut(write):
-        def inner(data):
-            if write.closed:
-                return
-            try:
-                write.write(data)
-            except BaseException:
-                if isinstance(data, bytes):
-                    data = data.decode('utf8')
-                    write.write(data)
-            write.flush()
+        async def inner(data):
+            nonlocal nwrt
+            await write.write(data, offset=nwrt)
+            nwrt += len(data)
         return inner
 
     params = {}
@@ -183,49 +198,52 @@ async def adoit(args=None):
         params = flatten(args.param)
         params = {k: v for k, v in [item.split('=') for item in params]}
         if args.verbose:
-            print('params:', params)
+            log.log('params:', params)
 
     wrap = msglenb.packer(dict() | params)
 
     outf = sys.stdout
     outfname = 'stdout'
 
-    if args.output:
-        outf = args.output
-        if outf != '-':
-            outfname = args.output
-            outf = open(outfname, 'wb')
+    if args.output and args.output != '-':
+        outfname = args.output
+        outf = aiaio.AIOFile(outfname, 'wb')
+        await outf.open()
 
     if args.verbose > 1:
-        print(f'cmd = {args.cmd}')
+        log.log(f'cmd = {args.cmd}')
 
     if args.cmd == "wrap":
         await stdinClose.wait()
         wrap = msglenb.packer(params)
         msg = wrap(data)
-        writeOut(outf)(msg)
+        await (writeOut(outf))(msg)
 
     elif args.cmd == "unwrap":
         await stdinClose.wait()
         wrap = msglenb.unwrap(data)
         msg, meta = wrap
         if args.param:
-            print(meta.asJSON())
+            log.log(meta.asJSON())
         elif args.verbose:
-            print('meta:', meta)
+            log.log('meta:', meta)
 
         if (args.param is None and not args.message) or (args.message):
-            writeOut(outf)(msg)
+            await (writeOut(outf))(msg)
 
     elif args.lines:
         lineradertask = asyncio.create_task(
             stdinlinehandler(
                 handleLine_unpack if args.unwrap or args.decode else
-                handleLine_repack if args.rewrap else handleLine_pack,
+                handleLine_count if args.count else
+                handleLine_repack if args.rewrap else
+                handleLine_pack,
                 maxlines = args.num_lines
             )
         )
         await lineradertask
+        if args.count:
+            log.log(f'{msgcount} messages unwrapped')
 
     elif args.cmd == "wraplines" or args.cmd == "readlines":
         lineradertask = asyncio.create_task(stdinlinehandler(handleLine_pack))
@@ -240,20 +258,26 @@ async def adoit(args=None):
 
     await asyncio.gather(*[datareader], return_exceptions=True)
 
+    await outf.close()
+    await aiaio.aio.release_globals()
+
     if args.verbose:
-        print('msgl command exit')
+        log.log('msgl command exit')
+    log.close()
+    await log.start()
 
 
 async def arun(args=None):
+    log.start()
     try:
         await adoit(args=args)
     except asyncio.exceptions.CancelledError as ex:
-        # print(f'cmdline program task cancelled: {ex}')
+        # log.log(f'cmdline program task cancelled: {ex}')
         pass
     except SystemExit as ex:
         sys.exit(ex)
     except BaseException as ex:
-        print(f'cmdline program caught exception: {ex} ({type(ex)})')
+        log.log(f'cmdline program caught exception: {ex} ({type(ex)})')
         raise ex
 
 
