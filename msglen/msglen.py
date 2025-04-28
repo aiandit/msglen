@@ -355,9 +355,15 @@ class MsglenL:
             if self.trace & trace_head:
                 print(f'read header data: {len(datahead)} B')
             headlen, msglen = self.headerInfo(datahead)
-            data = await read(msglen + headlen)
+            data = b''
+            while len(data) < msglen + headlen:
+                chunk = await read(msglen + headlen - len(data))
+                if len(chunk) == 0:
+                    break
+                data += chunk
             if self.trace & (trace_meta | trace_data):
                 print(f'read data: {len(data)} B')
+            assert len(data) == msglen + headlen
             return self.unpack(data, headlen, msglen)
 
         return inner
