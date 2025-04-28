@@ -272,8 +272,10 @@ async def arun(args=None):
     except asyncio.exceptions.CancelledError as ex:
         # print(f'cmdline program task cancelled: {ex}')
         pass
+    except SystemExit as ex:
+        sys.exit(ex)
     except BaseException as ex:
-        print(f'cmdline program caught exception: {ex}')
+        print(f'cmdline program caught exception: {ex} ({type(ex)})')
         raise ex
 
 
