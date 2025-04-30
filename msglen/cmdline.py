@@ -233,7 +233,7 @@ async def adoit(args=None):
             await (writeOut(outf))(msg)
 
     elif args.lines:
-        if args.unwrap or args.decode or args.count or args.repack:
+        if args.unwrap or args.decode or args.count or args.rewrap:
             if args.verbose:
                 log.log('read msgs')
             linereadertask = asyncio.create_task(
