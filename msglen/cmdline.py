@@ -2,6 +2,7 @@ import sys
 import asyncio
 import argparse
 import aiaio
+import json
 
 from . import __version__
 from . import __commit__
@@ -259,7 +260,9 @@ async def adoit(args=None):
             log.log('await line/msgreadertask')
         await linereadertask
         if args.count:
-            log.log(f'{msgcount} messages unwrapped')
+            if args.verbose:
+                log.log(f'{msgcount} messages unwrapped')
+            await writeOut(outf)(json.dumps(msgcount, indent=1).encode('utf8'))
 
     elif args.cmd == "wraplines" or args.cmd == "readlines":
         datareader = asyncio.create_task(readstdin(std_reader, std_writer))
