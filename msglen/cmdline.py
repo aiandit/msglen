@@ -1,12 +1,15 @@
 import sys
 import asyncio
 import argparse
+import aiaio
+import json
+
 from . import __version__
 from . import __commit__
 
 from .msglen import MsglenB, MsglenL
 from .stdinreader import connect_stdin_stdout, readmuch
-
+from . import log
 
 def mkparser(parser=None):
     if parser is None:
@@ -18,8 +21,10 @@ MsgLen CLI tool.
     parser.add_argument('-m', '--message', metavar='S', type=str, nargs='?', action='append')
     parser.add_argument('-n', '--num-lines', metavar='N', nargs='?', type=int, const=10)
     parser.add_argument('-l', '--lines', action='store_true')
+    parser.add_argument('-c', '--count', action='store_true')
     parser.add_argument('-d', '--decode', action='store_true')
     parser.add_argument('-u', '--unwrap', action='store_true')
+    parser.add_argument('-r', '--rewrap', action='store_true')
     parser.add_argument('-p', '--protocol', metavar='N', nargs='?', type=str, default='msgl')
     parser.add_argument('-s', '--param', metavar='N=V', type=str, nargs='*', action='append')
     parser.add_argument('-o', '--output', metavar='FILE', type=str)
@@ -53,7 +58,9 @@ async def adoit(args=None):
 
     msglenb = msgType
 
-    stdinComplete = asyncio.Event()
+    if args.verbose > 2:
+        msglenb.trace = 7
+
     stdinClose = asyncio.Event()
     stdinRead = asyncio.Condition()
 
@@ -71,14 +78,11 @@ async def adoit(args=None):
 
             callback = dataadd
 
-        count = 0
-
-        while count < 1 or not stdinClose.is_set():
-            count += 1
+        while not stdinClose.is_set():
             if std_reader:
                 fr = await readmuch(std_reader)
-                if args.verbose:
-                    print(f'readstdin: {len(fr)} B')
+                if args.verbose > 2:
+                    log.log(f'readstdin: {len(fr)} B')
 
                 if fr is not None:
                     await callback(fr)
@@ -90,39 +94,56 @@ async def adoit(args=None):
                         await callback(b'')
                         break
 
-        await stdinClose.wait()
+        stdinClose.set()
 
         if args.verbose:
-            print('readstdin exit')
+            log.log('readstdin exit')
 
         return data
 
 
     std_reader, std_writer = await connect_stdin_stdout()
-    datareader = asyncio.create_task(readstdin(std_reader, std_writer))
 
-    async def waitforstdinend():
-        if args.verbose > 1:
-            print('wait for stdin read end')
-        await stdinComplete.wait()
-        if args.verbose > 2:
-            print(f'got whole input! {data}')
+    async def msglenhandler(callback, maxlines=None):
+        if args.verbose:
+            log.log('msglenhandler...')
+        mread, mwrite = msglenb.readers(std_reader.read, std_writer.write)
+        nlines = 0
+        while maxlines is None or nlines < maxlines:
+            if args.verbose:
+                log.log('msglenhandler...')
+            try:
+                msg, meta = await mread()
+                if msg is None and meta is None:
+                    break
+                await callback(msg, meta)
+                nlines += 1
+            except BaseException as ex:
+                raise ex
+
 
     async def stdinlinehandler(callback, maxlines=None):
         nonlocal lines
         stop = False
         nlines = 0
-        while maxlines is None or nlines < maxlines:
+        while not stop and (maxlines is None or nlines < maxlines):
             if args.verbose > 1:
-                print('wait for stdin read')
-            async with stdinRead:
-                await stdinRead.wait()
+                log.log(f'{len(lines)} lines available')
+            if len(lines) == 0:
+                if stdinClose.is_set():
+                    break
+                else:
+                    if args.verbose > 1:
+                        log.log('wait for stdin read')
+                    async with stdinRead:
+                        await stdinRead.wait()
             while len(lines) > 0:
                 if maxlines is not None and nlines >= maxlines:
                     break
                 data = lines[0]
                 if args.verbose > 1:
-                    print(f'got {len(lines)} input lines: {data}')
+                    log.log(f'got {len(lines)} input lines')
+                    log.log(f'first line: {data[0:16]} ({len(data)} B)')
                 if len(data) == 0:
                     stop = True
                     break
@@ -130,150 +151,155 @@ async def adoit(args=None):
                 lines = lines[1:]
                 nlines += 1
         if args.verbose:
-            print('stdinlinehandler exit')
+            log.log('stdinlinehandler exit')
 
     async def handleLine_pack(data):
         msg = wrap(data)
-        writeOut(outf)(msg)
+        await (writeOut(outf))(msg)
 
-    async def handleLine_unpack(data):
-        try:
-            msg, meta = msglenb.unwrap(data)
-        except ValueError as ex:
-            msg, meta = None, None
-            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
-            print(f'msglen infalid data: {data[0:128]}')
-            return
+    async def handleLine_unpack(msg, meta):
         if args.param:
-            print(meta.asJSON())
+            log.log(meta.asJSON())
         elif args.verbose:
-            print('meta:', meta)
+            log.log('meta:', meta)
 
         if (args.param is None and not args.message) or (args.message):
-            writeOut(outf)(msg)
+            await (writeOut(outf))(msg)
 
-    async def handleLine_repack(data):
-        try:
-            msg, meta = msglenb.unwrap(data)
-        except ValueError as ex:
-            msg, meta = None, None
-            print(f'msglen unwrap failed to process {len(data)} B of data: ', ex)
-            print(f'msglen infalid data: {data[0:128]}')
-            return
+    async def handleLine_repack(msg, meta):
         if args.param:
-            print(meta.asJSON())
+            log.log(meta.asJSON())
         elif args.verbose:
-            print('meta:', meta)
+            log.log('meta:', meta)
 
         rmsg = wrap(msg, vars(meta))
-        writeOut(outf)(rmsg)
+        await (writeOut(outf))(rmsg)
+
+
+    msgcount = dict(count=0,rawbytes=0,bytes=0,errors=0,errbytes=0)
+    async def handleLine_count(msg, meta):
+        msgcount['rawbytes'] += len(data)
+        msgcount['count'] += 1
+        msgcount['bytes'] += len(msg)
 
 
     def writeOut(write):
-        def inner(data):
-            if write.closed:
-                return
+        async def inner(data):
             try:
-                write.write(data)
-            except BaseException:
-                if isinstance(data, bytes):
-                    data = data.decode('utf8')
-                    write.write(data)
-            write.flush()
+                if outfname == 'stdout':
+                    write.write(data.decode('utf8'))
+                else:
+                    await write.write(data)
+            except BaseException as ex:
+                log.log(f'write failed exception: {ex} ({type(ex)})')
         return inner
-
-    waitforstdinendtask = asyncio.create_task(waitforstdinend())
 
     params = {}
     if args.param:
         params = flatten(args.param)
         params = {k: v for k, v in [item.split('=') for item in params]}
         if args.verbose:
-            print('params:', params)
+            log.log('params:', params)
 
     wrap = msglenb.packer(dict() | params)
 
     outf = sys.stdout
     outfname = 'stdout'
 
-    if args.output:
-        outf = args.output
-        if outf != '-':
-            outfname = args.output
-            outf = open(outfname, 'wb')
+    if args.output and args.output != '-':
+        outfname = args.output
+        outf = await aiaio.aio_open(outfname, 'wb')
 
     if args.verbose > 1:
-        print(f'cmd = {args.cmd}')
+        log.log(f'cmd = {args.cmd}')
 
     if args.cmd == "wrap":
-        stdinClose.set()
+        datareader = asyncio.create_task(readstdin(std_reader, std_writer))
         await datareader
         wrap = msglenb.packer(params)
         msg = wrap(data)
-        writeOut(outf)(msg)
+        await (writeOut(outf))(msg)
 
     elif args.cmd == "unwrap":
-        await waitforstdinendtask
+        datareader = asyncio.create_task(readstdin(std_reader, std_writer))
+        await datareader
         wrap = msglenb.unwrap(data)
         msg, meta = wrap
         if args.param:
-            print(meta.asJSON())
+            log.log(meta.asJSON())
         elif args.verbose:
-            print('meta:', meta)
+            log.log('meta:', meta)
 
         if (args.param is None and not args.message) or (args.message):
-            writeOut(outf)(msg)
+            await (writeOut(outf))(msg)
 
     elif args.lines:
-        lineradertask = asyncio.create_task(
-            stdinlinehandler(
-                handleLine_unpack if args.unwrap or args.decode else handleLine_pack,
-                maxlines = args.num_lines
+        if args.unwrap or args.decode or args.count or args.rewrap:
+            if args.verbose:
+                log.log('read msgs')
+            linereadertask = asyncio.create_task(
+                msglenhandler(
+                    handleLine_unpack if args.unwrap or args.decode else
+                    handleLine_count if args.count else
+                    handleLine_repack,
+                    maxlines = args.num_lines
+                )
             )
-        )
-        await lineradertask
+        else:
+            datareader = asyncio.create_task(readstdin(std_reader, std_writer))
+            linereadertask = asyncio.create_task(
+                stdinlinehandler(
+                    handleLine_pack,
+                    maxlines = args.num_lines
+                )
+            )
+            if args.verbose:
+                log.log('await datareader')
+            await datareader
+        if args.verbose:
+            log.log('await line/msgreadertask')
+        await linereadertask
+        if args.count:
+            if args.verbose:
+                log.log(f'{msgcount} messages unwrapped')
+            await writeOut(outf)(json.dumps(msgcount, indent=1).encode('utf8'))
 
     elif args.cmd == "wraplines" or args.cmd == "readlines":
-        lineradertask = asyncio.create_task(stdinlinehandler(handleLine_pack))
-        await lineradertask
+        datareader = asyncio.create_task(readstdin(std_reader, std_writer))
+        linereadertask = asyncio.create_task(stdinlinehandler(handleLine_pack))
+        await datareader
+        await linereadertask
 
     elif args.cmd == "unwrapmsgs" or args.cmd == "unwraplines":
-        lineradertask = asyncio.create_task(stdinlinehandler(handleLine_unpack))
-        await lineradertask
+        linereadertask = asyncio.create_task(msglenhandler(handleLine_unpack))
+        await linereadertask
 
-    elif args.cmd == "head":
-        lineradertask = asyncio.create_task(
-            stdinlinehandler(
-                handleLine_repack,
-                maxlines = args.num_lines
-            )
-        )
-        await lineradertask
-
-    stdinComplete.set()
     stdinClose.set()
 
-    if args.verbose:
-        print('cancel datareader')
-    datareader.cancel()
-
-    await asyncio.gather(*[waitforstdinendtask, datareader], return_exceptions=True)
+    if outfname != 'stdout':
+        await outf.close()
+        await aiaio.release_globals()
 
     if args.verbose:
-        print('msgl command exit')
-
-    #std_info[0].close()
-    #std_info[2].close()
+        log.log('msgl command exit')
+    log.close()
+    await log.start()
 
 
 async def arun(args=None):
+    log.start()
     try:
         await adoit(args=args)
     except asyncio.exceptions.CancelledError as ex:
-        # print(f'cmdline program task cancelled: {ex}')
+        # log.log(f'cmdline program task cancelled: {ex}')
         pass
+    except SystemExit as ex:
+        sys.exit(ex)
     except BaseException as ex:
-        print(f'cmdline program caught exception: {ex}')
+        log.log(f'cmdline program caught exception: {ex} ({type(ex)})')
+        raise ex
+    except ValueError as ex:
+        log.log(f'cmdline program caught exception: {ex} ({type(ex)})')
         raise ex
 
 

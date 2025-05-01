@@ -305,7 +305,7 @@ class MsglenL:
         databody = data[headlen:]
 
         if len(databody) != msglen:
-            raise ValueError(f'invalid msglen data, cannot unwrap: {headlen}+{msglen} != {len(data)}')
+            raise ValueError(f'invalid msglen data, cannot unwrap: {msglen}+{headlen} != {len(data)}')
         assert len(databody) == msglen
 
         if toDict:
@@ -355,9 +355,15 @@ class MsglenL:
             if self.trace & trace_head:
                 print(f'read header data: {len(datahead)} B')
             headlen, msglen = self.headerInfo(datahead)
-            data = await read(msglen + headlen)
+            data = b''
+            while len(data) < msglen + headlen:
+                chunk = await read(msglen + headlen - len(data))
+                if len(chunk) == 0:
+                    break
+                data += chunk
             if self.trace & (trace_meta | trace_data):
                 print(f'read data: {len(data)} B')
+            assert len(data) == msglen + headlen
             return self.unpack(data, headlen, msglen)
 
         return inner
