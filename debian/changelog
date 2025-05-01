@@ -1,3 +1,11 @@
+msglen (25.5-1) unstable; urgency=medium
+
+  * Simplify CLI tool
+  * Use async logging, output
+  * More tests
+
+ -- Johannes Willkomm <johannes.willkomm@googlemail.com>  Thu, 01 May 2025 17:10:18 +0200
+
 msglen (25.4.3-1) unstable; urgency=medium
 
   * New cmdline options
